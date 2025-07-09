@@ -10,7 +10,7 @@ import json # For passing data between Python and JavaScript
 # Page configuration
 st.set_page_config(
     page_title="Threat Model",
-    page_icon="�",
+    page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -518,7 +518,8 @@ def main():
                 <label for="connDescription">Description:</label>
                 <textarea id="connDescription"></textarea>
                 <label for="connTrustBoundary">Trust Boundary Crossed:</label>
-                <input type="text" id="connTrustBoundary">
+                <select id="connTrustBoundary"></select>
+                <input type="text" id="newTrustBoundaryText" placeholder="Enter new boundary name" style="display: none;">
                 <div style="display: flex; justify-content: space-between;">
                     <button type="button" class="cancel" onclick="closeModal('addConnectionModal')">Cancel</button>
                     <button type="button" onclick="saveConnection()">Add Connection</button>
@@ -532,6 +533,7 @@ def main():
             let nodes = {json.dumps(st.session_state.architecture['components'])};
             let connections = {json.dumps(st.session_state.architecture['connections'])};
             let selectedNode = null;
+            let threatBoundaryNames = {json.dumps(list(st.session_state.threat_model.keys()))};
 
             // Function to send data back to Streamlit
             function sendDataToStreamlit() {{
@@ -706,7 +708,44 @@ def main():
                 }});
                 document.getElementById('connDataFlow').value = '';
                 document.getElementById('connDescription').value = '';
-                document.getElementById('connTrustBoundary').value = '';
+
+                const trustBoundarySelect = document.getElementById('connTrustBoundary');
+                trustBoundarySelect.innerHTML = ''; // Clear previous options
+                
+                // Add default option
+                const defaultOption = document.createElement('option');
+                defaultOption.value = "";
+                defaultOption.textContent = "-- Select or Type New --";
+                trustBoundarySelect.appendChild(defaultOption);
+
+                // Add existing boundaries
+                threatBoundaryNames.forEach(boundary => {{
+                    const option = document.createElement('option');
+                    option.value = boundary;
+                    option.textContent = boundary;
+                    trustBoundarySelect.appendChild(option);
+                }});
+
+                const newBoundaryTextInput = document.getElementById('newTrustBoundaryText');
+                newBoundaryTextInput.style.display = 'none'; // Hide by default
+                newBoundaryTextInput.value = ''; // Clear value
+
+                // Add 'Other / New Boundary' option
+                const otherOption = document.createElement('option');
+                otherOption.value = "NEW_BOUNDARY";
+                otherOption.textContent = "Other / New Boundary";
+                trustBoundarySelect.appendChild(otherOption);
+
+                // Event listener for select change
+                trustBoundarySelect.onchange = function() {{
+                    if (this.value === "NEW_BOUNDARY") {{
+                        newBoundaryTextInput.style.display = 'block';
+                        newBoundaryTextInput.focus();
+                    }} else {{
+                        newBoundaryTextInput.style.display = 'none';
+                    }}
+                }};
+
                 openModal('addConnectionModal');
             }});
 
@@ -715,7 +754,21 @@ def main():
                 const targetId = document.getElementById('connTarget').value;
                 const dataFlow = document.getElementById('connDataFlow').value;
                 const description = document.getElementById('connDescription').value;
-                const trustBoundary = document.getElementById('connTrustBoundary').value;
+                
+                const trustBoundarySelect = document.getElementById('connTrustBoundary');
+                const newTrustBoundaryTextInput = document.getElementById('newTrustBoundaryText');
+                let trustBoundary = trustBoundarySelect.value;
+
+                if (trustBoundary === "NEW_BOUNDARY") {{
+                    trustBoundary = newTrustBoundaryTextInput.value.trim();
+                    if (!trustBoundary) {{
+                        alert('Please enter a name for the new trust boundary.');
+                        return;
+                    }}
+                }} else if (trustBoundary === "") {{ // If default "-- Select or Type New --" is chosen
+                    trustBoundary = "N/A"; // Or leave empty for no boundary
+                }}
+
 
                 if (sourceId && targetId && dataFlow && sourceId !== targetId) {{
                     const newId = 'conn-' + Math.random().toString(36).substr(2, 9);
@@ -762,7 +815,7 @@ def main():
 
     # Hidden text area to receive data from JavaScript
     # Streamlit will re-run the script when this value changes
-    architecture_data_json = st.text_area("architecture_data_transfer", value=json.dumps(st.session_state.architecture), height=1, key="streamlit_output_data", help="Do not modify this field directly.", disabled=True)
+    architecture_data_json = st.text_area("architecture_data_transfer", value=json.dumps(st.session_state.architecture), height=68, key="streamlit_output_data", help="Do not modify this field directly.", disabled=True)
 
     # Process data received from JavaScript
     if architecture_data_json:
