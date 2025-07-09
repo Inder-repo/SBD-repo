@@ -8,7 +8,7 @@ import uuid # For generating unique IDs for new entries
 
 # Page configuration
 st.set_page_config(
-    page_title="SecureBank Threat Model",
+    page_title="Threat Model", # Updated title here
     page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -60,7 +60,7 @@ st.markdown("""
         background: white;
         padding: 1rem;
         border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        box_shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         text-align: center;
     }
     
@@ -134,11 +134,18 @@ def get_initial_threat_data():
 if 'threat_model' not in st.session_state:
     st.session_state.threat_model = get_initial_threat_data()
 
+# Initialize session state for architecture data
+if 'architecture' not in st.session_state:
+    st.session_state.architecture = {
+        'components': [],
+        'connections': []
+    }
+
 def main():
     # Header
     st.markdown("""
     <div class="main-header">
-        <h1>🏦 SecureBank Threat Model Dashboard</h1>
+        <h1>🏦 Threat Model Dashboard</h1>
         <p>Comprehensive Trust Boundary Analysis with Threats, Risks & Mitigations</p>
     </div>
     """, unsafe_allow_html=True)
@@ -147,7 +154,7 @@ def main():
     st.sidebar.title("🔍 Navigation")
     view_mode = st.sidebar.selectbox(
         "Select View Mode",
-        ["Overview Dashboard", "Trust Boundaries", "Threat Analysis", "Risk Assessment", "Mitigation Strategies", "STRIDE Analysis", "Manage Threat Model"]
+        ["Overview Dashboard", "Trust Boundaries", "Threat Analysis", "Risk Assessment", "Mitigation Strategies", "STRIDE Analysis", "Manage Threat Model", "Architecture & Threat Suggestion"]
     )
     
     # Risk filter
@@ -162,8 +169,9 @@ def main():
     st.sidebar.markdown("---")
     if st.sidebar.button("🔄 Reset Threat Model"):
         st.session_state.threat_model = get_initial_threat_data()
+        st.session_state.architecture = {'components': [], 'connections': []} # Also reset architecture
         st.rerun()
-        st.success("Threat model reset to default data!")
+        st.success("Threat model and architecture reset to default data!")
     
     if view_mode == "Overview Dashboard":
         display_overview_dashboard(st.session_state.threat_model, risk_filter)
@@ -179,6 +187,8 @@ def main():
         display_stride_analysis(st.session_state.threat_model, risk_filter)
     elif view_mode == "Manage Threat Model":
         manage_threat_model()
+    elif view_mode == "Architecture & Threat Suggestion":
+        display_architecture_and_suggest_threats()
 
 def display_overview_dashboard(threat_data, risk_filter):
     st.header("📊 Overview Dashboard")
@@ -847,6 +857,367 @@ def manage_threat_model():
     else:
         st.info(f"No threats defined for '{selected_boundary_to_manage}'. Add one above.")
 
+def display_architecture_and_suggest_threats():
+    st.header("🏗️ Architecture Diagram & Automated Threat Suggestion")
+    st.write("Define your system components and their connections to visualize your architecture and get automated threat suggestions.")
+
+    # --- Manage Components ---
+    st.subheader("1. Define System Components")
+    
+    # Add New Component
+    with st.expander("➕ Add New Component"):
+        with st.form("add_component_form", clear_on_submit=True):
+            comp_name = st.text_input("Component Name", key="new_comp_name")
+            comp_type = st.selectbox("Component Type", ["User", "Web Server", "Application Server", "Database", "API Gateway", "Load Balancer", "Firewall", "External Service", "Authentication Service", "Core Banking System"], key="new_comp_type")
+            comp_description = st.text_area("Description", key="new_comp_desc")
+            
+            if st.form_submit_button("Add Component"):
+                if comp_name:
+                    st.session_state.architecture['components'].append({
+                        'id': str(uuid.uuid4()),
+                        'name': comp_name,
+                        'type': comp_type,
+                        'description': comp_description
+                    })
+                    st.success(f"Component '{comp_name}' added!")
+                    st.rerun()
+                else:
+                    st.error("Component Name cannot be empty.")
+    
+    # List and Edit/Delete Components
+    if st.session_state.architecture['components']:
+        st.markdown("#### Existing Components:")
+        comp_to_edit_delete = st.selectbox(
+            "Select Component to Edit/Delete",
+            [c['name'] for c in st.session_state.architecture['components']],
+            key="select_comp_to_manage"
+        )
+        
+        selected_comp = next((c for c in st.session_state.architecture['components'] if c['name'] == comp_to_edit_delete), None)
+        
+        if selected_comp:
+            comp_idx = st.session_state.architecture['components'].index(selected_comp)
+            
+            col_edit_del_comp = st.columns(2)
+            with col_edit_del_comp[0]:
+                with st.expander(f"✏️ Edit '{selected_comp['name']}'"):
+                    with st.form(f"edit_comp_form_{selected_comp['id']}", clear_on_submit=False):
+                        edited_comp_name = st.text_input("Component Name", value=selected_comp['name'], key=f"edit_comp_name_{selected_comp['id']}")
+                        edited_comp_type = st.selectbox("Component Type", ["User", "Web Server", "Application Server", "Database", "API Gateway", "Load Balancer", "Firewall", "External Service", "Authentication Service", "Core Banking System"], index=["User", "Web Server", "Application Server", "Database", "API Gateway", "Load Balancer", "Firewall", "External Service", "Authentication Service", "Core Banking System"].index(selected_comp['type']), key=f"edit_comp_type_{selected_comp['id']}")
+                        edited_comp_description = st.text_area("Description", value=selected_comp['description'], key=f"edit_comp_desc_{selected_comp['id']}")
+                        
+                        if st.form_submit_button("Save Component Changes"):
+                            st.session_state.architecture['components'][comp_idx].update({
+                                'name': edited_comp_name,
+                                'type': edited_comp_type,
+                                'description': edited_comp_description
+                            })
+                            st.success(f"Component '{edited_comp_name}' updated!")
+                            st.rerun()
+            with col_edit_del_comp[1]:
+                if st.button(f"🗑️ Delete '{selected_comp['name']}'", key=f"delete_comp_{selected_comp['id']}"):
+                    # Also remove any connections involving this component
+                    st.session_state.architecture['connections'] = [
+                        conn for conn in st.session_state.architecture['connections']
+                        if conn['source_id'] != selected_comp['id'] and conn['target_id'] != selected_comp['id']
+                    ]
+                    st.session_state.architecture['components'].pop(comp_idx)
+                    st.success(f"Component '{selected_comp['name']}' and its connections deleted!")
+                    st.rerun()
+    else:
+        st.info("No components defined yet.")
+
+    st.markdown("---")
+
+    # --- Manage Connections ---
+    st.subheader("2. Define Data Flows (Connections)")
+
+    if len(st.session_state.architecture['components']) < 2:
+        st.warning("Please add at least two components to define connections.")
+    else:
+        component_options = {c['name']: c['id'] for c in st.session_state.architecture['components']}
+        
+        with st.expander("➕ Add New Connection"):
+            with st.form("add_connection_form", clear_on_submit=True):
+                source_name = st.selectbox("Source Component", list(component_options.keys()), key="new_conn_source")
+                target_name = st.selectbox("Target Component", list(component_options.keys()), key="new_conn_target")
+                data_flow_type = st.text_input("Data Flow Type (e.g., HTTP/S, Database Query, API Call)", key="new_conn_data_flow")
+                conn_description = st.text_area("Connection Description", key="new_conn_desc")
+                trust_boundary_crossing = st.text_input("Trust Boundary Crossed (e.g., Internet -> DMZ)", help="Define the trust boundary this connection crosses, if any.", key="new_conn_tb")
+
+                if st.form_submit_button("Add Connection"):
+                    if source_name and target_name and data_flow_type and source_name != target_name:
+                        source_id = component_options[source_name]
+                        target_id = component_options[target_name]
+                        st.session_state.architecture['connections'].append({
+                            'id': str(uuid.uuid4()),
+                            'source_id': source_id,
+                            'target_id': target_id,
+                            'data_flow': data_flow_type,
+                            'description': conn_description,
+                            'trust_boundary_crossing': trust_boundary_crossing if trust_boundary_crossing else "N/A"
+                        })
+                        st.success(f"Connection from '{source_name}' to '{target_name}' added!")
+                        st.rerun()
+                    else:
+                        st.error("Please select valid source and target components (must be different) and provide a data flow type.")
+        
+        # List and Edit/Delete Connections
+        if st.session_state.architecture['connections']:
+            st.markdown("#### Existing Connections:")
+            conn_display_options = []
+            for conn in st.session_state.architecture['connections']:
+                source_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['source_id']), {'name': 'Unknown'})
+                target_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['target_id']), {'name': 'Unknown'})
+                conn_display_options.append(f"{source_comp['name']} -> {target_comp['name']} ({conn['data_flow']})")
+
+            selected_conn_to_manage_display = st.selectbox(
+                "Select Connection to Edit/Delete",
+                conn_display_options,
+                key="select_conn_to_manage"
+            )
+            
+            selected_conn_idx = conn_display_options.index(selected_conn_to_manage_display)
+            selected_conn = st.session_state.architecture['connections'][selected_conn_idx]
+
+            col_edit_del_conn = st.columns(2)
+            with col_edit_del_conn[0]:
+                with st.expander(f"✏️ Edit Connection: {selected_conn_to_manage_display}"):
+                    with st.form(f"edit_conn_form_{selected_conn['id']}", clear_on_submit=False):
+                        edited_data_flow_type = st.text_input("Data Flow Type", value=selected_conn['data_flow'], key=f"edit_conn_data_flow_{selected_conn['id']}")
+                        edited_conn_description = st.text_area("Connection Description", value=selected_conn['description'], key=f"edit_conn_desc_{selected_conn['id']}")
+                        edited_trust_boundary_crossing = st.text_input("Trust Boundary Crossed", value=selected_conn['trust_boundary_crossing'], key=f"edit_conn_tb_{selected_conn['id']}")
+                        
+                        if st.form_submit_button("Save Connection Changes"):
+                            st.session_state.architecture['connections'][selected_conn_idx].update({
+                                'data_flow': edited_data_flow_type,
+                                'description': edited_conn_description,
+                                'trust_boundary_crossing': edited_trust_boundary_crossing
+                            })
+                            st.success("Connection updated!")
+                            st.rerun()
+            with col_edit_del_conn[1]:
+                if st.button(f"🗑️ Delete Connection: {selected_conn_to_manage_display}", key=f"delete_conn_{selected_conn['id']}"):
+                    st.session_state.architecture['connections'].pop(selected_conn_idx)
+                    st.success("Connection deleted!")
+                    st.rerun()
+        else:
+            st.info("No connections defined yet.")
+
+    st.markdown("---")
+
+    # --- Visualize Architecture ---
+    st.subheader("3. Visualize Architecture")
+    if st.session_state.architecture['components']:
+        fig = go.Figure()
+
+        # Add nodes
+        node_x = []
+        node_y = []
+        node_text = []
+        node_hover_text = []
+        node_colors = []
+        
+        # Simple layout: arrange in a circle or grid
+        num_components = len(st.session_state.architecture['components'])
+        radius = 5 # Arbitrary radius for circular layout
+        for i, comp in enumerate(st.session_state.architecture['components']):
+            angle = 2 * np.pi * i / num_components
+            node_x.append(radius * np.cos(angle))
+            node_y.append(radius * np.sin(angle))
+            node_text.append(comp['name'])
+            node_hover_text.append(f"<b>Name:</b> {comp['name']}<br><b>Type:</b> {comp['type']}<br><b>Description:</b> {comp['description']}")
+            
+            # Assign colors based on component type
+            if comp['type'] == "User":
+                node_colors.append('lightcoral')
+            elif comp['type'] == "Web Server":
+                node_colors.append('lightblue')
+            elif comp['type'] == "Application Server":
+                node_colors.append('lightgreen')
+            elif comp['type'] == "Database":
+                node_colors.append('lightsalmon')
+            elif comp['type'] == "External Service":
+                node_colors.append('lightgray')
+            else:
+                node_colors.append('lightgoldenrodyellow')
+
+        fig.add_trace(go.Scatter(
+            x=node_x,
+            y=node_y,
+            mode='markers+text',
+            text=node_text,
+            textposition='top center',
+            hoverinfo='text',
+            hovertext=node_hover_text,
+            marker=dict(
+                size=30,
+                color=node_colors,
+                line_width=2,
+                line_color='darkslategray'
+            ),
+            name='Components'
+        ))
+
+        # Add edges (connections)
+        edge_x = []
+        edge_y = []
+        edge_text = []
+        for conn in st.session_state.architecture['connections']:
+            source_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['source_id']), None)
+            target_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['target_id']), None)
+            
+            if source_comp and target_comp:
+                source_idx = st.session_state.architecture['components'].index(source_comp)
+                target_idx = st.session_state.architecture['components'].index(target_comp)
+                
+                edge_x.extend([node_x[source_idx], node_x[target_idx], None])
+                edge_y.extend([node_y[source_idx], node_y[target_idx], None])
+                edge_text.append(f"<b>Data Flow:</b> {conn['data_flow']}<br><b>Boundary:</b> {conn['trust_boundary_crossing']}")
+
+        fig.add_trace(go.Scatter(
+            x=edge_x,
+            y=edge_y,
+            mode='lines',
+            line=dict(width=2, color='darkblue'),
+            hoverinfo='text',
+            hovertext=edge_text,
+            name='Connections'
+        ))
+
+        fig.update_layout(
+            title="System Architecture Diagram",
+            showlegend=False,
+            hovermode='closest',
+            margin=dict(b=20,l=5,r=5,t=40),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            height=600
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Define components and connections to see the architecture diagram.")
+
+    st.markdown("---")
+
+    # --- Automated Threat Suggestion ---
+    st.subheader("4. Automated Threat Suggestions")
+    st.write("Based on your defined architecture, here are some suggested threats:")
+
+    suggested_threats = []
+
+    # Rule-based threat suggestion
+    for conn in st.session_state.architecture['connections']:
+        source_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['source_id']), None)
+        target_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['target_id']), None)
+
+        if source_comp and target_comp:
+            # Rule 1: Internet-facing components (User -> Web Server/Load Balancer)
+            if source_comp['type'] == 'User' and (target_comp['type'] == 'Web Server' or target_comp['type'] == 'Load Balancer'):
+                if 'Phishing Attacks' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                if 'DDoS Attacks' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                if 'SQL Injection' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'SQL Injection', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                if 'Cross-Site Scripting (XSS)' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Cross-Site Scripting (XSS)', 'category': 'Tampering', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+
+            # Rule 2: Application to Database
+            if source_comp['type'] == 'Application Server' and target_comp['type'] == 'Database':
+                if 'Database Injection' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Database Injection', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                if 'Data Exfiltration' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                if 'Unauthorized Data Access' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Unauthorized Data Access', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+
+            # Rule 3: Connections crossing "Internal" boundaries (simplified)
+            if "internal" in conn['trust_boundary_crossing'].lower():
+                if 'Lateral Movement' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                if 'Internal Service Spoofing' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Internal Service Spoofing', 'category': 'Spoofing', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+
+            # Rule 4: External Integrations
+            if target_comp['type'] == 'External Service' or source_comp['type'] == 'External Service':
+                if 'API Key Exposure' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'API Key Exposure', 'category': 'Information Disclosure', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                if 'Data Sharing Violation' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Data Sharing Violation', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+
+            # Rule 5: Authentication Services
+            if target_comp['type'] == 'Authentication Service':
+                if 'Authentication Bypass' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Authentication Bypass', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                if 'Credential Stuffing' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Credential Stuffing', 'category': 'Elevation of Privilege', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+
+            # Rule 6: Core Banking System
+            if target_comp['type'] == 'Core Banking System':
+                if 'Financial Fraud' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Financial Fraud', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                if 'Transaction Manipulation' not in [t['name'] for t in suggested_threats]:
+                    suggested_threats.append({'name': 'Transaction Manipulation', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+
+
+    if suggested_threats:
+        st.write("Review the suggested threats and add them to your main threat model if relevant.")
+        
+        # Create a DataFrame for display and selection
+        df_suggested_threats = pd.DataFrame(suggested_threats)
+        df_suggested_threats['risk_score'], df_suggested_threats['risk_level'] = zip(*df_suggested_threats.apply(lambda row: calculate_risk(row['likelihood'], row['impact']), axis=1))
+        
+        # Display suggested threats in a table
+        st.dataframe(df_suggested_threats[['name', 'category', 'likelihood', 'impact', 'risk_score', 'risk_level', 'boundary']], use_container_width=True)
+
+        st.markdown("---")
+        st.subheader("Add Selected Suggested Threats to Threat Model")
+        
+        # Allow user to select which threats to add
+        threat_names_to_add = st.multiselect(
+            "Select threats to add to your main threat model:",
+            [t['name'] for t in suggested_threats],
+            key="select_threats_to_add"
+        )
+
+        if st.button("Add Selected Threats to Threat Model"):
+            added_count = 0
+            for threat_name in threat_names_to_add:
+                threat_to_add = next((t for t in suggested_threats if t['name'] == threat_name), None)
+                if threat_to_add:
+                    # Find the boundary in the main threat_model data structure
+                    # If the boundary doesn't exist, create it (simplified approach)
+                    boundary_name = threat_to_add['boundary']
+                    if boundary_name not in st.session_state.threat_model:
+                        st.session_state.threat_model[boundary_name] = {
+                            'description': f"Automatically generated boundary from architecture: {boundary_name}",
+                            'components': [], # Components will be derived from architecture if needed
+                            'threats': []
+                        }
+                    
+                    # Check if threat already exists in the target boundary to avoid duplicates
+                    existing_threat_names = [t['name'] for t in st.session_state.threat_model[boundary_name]['threats']]
+                    if threat_to_add['name'] not in existing_threat_names:
+                        new_threat_id = f"T_Arch_{str(uuid.uuid4())[:4]}"
+                        st.session_state.threat_model[boundary_name]['threats'].append({
+                            'id': new_threat_id,
+                            'name': threat_to_add['name'],
+                            'category': threat_to_add['category'],
+                            'likelihood': threat_to_add['likelihood'],
+                            'impact': threat_to_add['impact'],
+                            'risk_score': threat_to_add['risk_score'],
+                            'risk_level': threat_to_add['risk_level'],
+                            'mitigations': [] # Start with no mitigations, user can add them later
+                        })
+                        added_count += 1
+            if added_count > 0:
+                st.success(f"Successfully added {added_count} selected threats to your threat model!")
+                st.rerun()
+            else:
+                st.info("No new threats were added (they might already exist or none were selected).")
+    else:
+        st.info("No threats suggested based on the current architecture. Define more components and connections.")
 
 if __name__ == "__main__":
     main()
