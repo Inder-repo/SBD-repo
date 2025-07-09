@@ -1,4 +1,27 @@
-streamlit
-pandas
-openpyxl
-xhtml2pdf
+# Streamlit Threat Modeling Application Requirements
+
+# Core web framework
+streamlit>=1.28.0
+
+# Data manipulation and analysis
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Data visualization
+plotly>=5.15.0
+
+# Additional utilities
+uuid  # Built-in Python module, no installation needed
+json  # Built-in Python module, no installation needed
+datetime  # Built-in Python module, no installation needed
+math  # Built-in Python module, no installation needed
+
+# Optional: For enhanced functionality (if you want to extend the app)
+# streamlit-aggrid>=0.3.4  # For advanced data tables
+# streamlit-plotly-events>=0.0.6  # For interactive plot events
+# streamlit-option-menu>=0.3.6  # For enhanced navigation menus
+
+# Development dependencies (optional)
+# pytest>=7.4.0  # For testing
+# black>=23.0.0  # For code formatting
+# flake8>=6.0.0  # For code linting
