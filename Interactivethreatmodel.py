@@ -56,7 +56,7 @@ st.markdown("""
         padding: 0.8rem;
         border-radius: 8px;
         margin-bottom: 0.5rem;
-        border-left: 4px solid #51cf66;
+        border-left: 44px solid #51cf66;
     }
     
     .risk-critical { background-color: #dc3545; color: white; padding: 0.3rem; border-radius: 5px; }
@@ -1243,56 +1243,109 @@ def render_threat_model_dashboard():
         if source_comp and target_comp:
             # Rule 1: Internet-facing components (User -> Web Server/Load Balancer)
             if source_comp['type'] == 'User' and (target_comp['type'] == 'Web Server' or target_comp['type'] == 'Load Balancer'):
-                # Spoofing: Phishing attacks targeting users
+                likelihood = 4
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Phishing Attacks' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 3
+                impact = 4
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'DDoS Attacks' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 2
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'SQL Injection' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'SQL Injection', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'SQL Injection', 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 3
+                impact = 4
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Cross-Site Scripting (XSS)' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Cross-Site Scripting (XSS)', 'category': 'Tampering', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Cross-Site Scripting (XSS)', 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 2: Application to Database
             if source_comp['type'] == 'Application Server' and target_comp['type'] == 'Database':
+                likelihood = 3
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Database Injection' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Database Injection', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Database Injection', 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 2
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Data Exfiltration' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 2
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Unauthorized Data Access' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Unauthorized Data Access', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Unauthorized Data Access', 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 3: Connections crossing "Internal" boundaries (simplified)
             if "internal" in conn['trust_boundary_crossing'].lower():
+                likelihood = 2
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Lateral Movement' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 2
+                impact = 4
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Internal Service Spoofing' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Internal Service Spoofing', 'category': 'Spoofing', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Internal Service Spoofing', 'category': 'Spoofing', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 4: External Integrations
             if target_comp['type'] == 'External Service' or source_comp['type'] == 'External Service':
+                likelihood = 3
+                impact = 4
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'API Key Exposure' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'API Key Exposure', 'category': 'Information Disclosure', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'API Key Exposure', 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 2
+                impact = 4
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Data Sharing Violation' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Data Sharing Violation', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Data Sharing Violation', 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 5: Authentication Services
             if target_comp['type'] == 'Authentication Service':
+                likelihood = 2
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Authentication Bypass' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Authentication Bypass', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Authentication Bypass', 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 3
+                impact = 4
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Credential Stuffing' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Credential Stuffing', 'category': 'Elevation of Privilege', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Credential Stuffing', 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 6: Core Banking System
             if target_comp['type'] == 'Core Banking System':
+                likelihood = 2
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Financial Fraud' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Financial Fraud', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Financial Fraud', 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
+                
+                likelihood = 2
+                impact = 5
+                risk_score, risk_level = calculate_risk(likelihood, impact)
                 if 'Transaction Manipulation' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': 'Transaction Manipulation', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                    suggested_threats.append({'name': 'Transaction Manipulation', 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing']})
 
     if suggested_threats:
+        # No need to recalculate risk_score/risk_level here as they are already in the dicts
         df_suggested_threats = pd.DataFrame(suggested_threats)
-        df_suggested_threats['risk_score'], df_suggested_threats['risk_level'] = zip(*df_suggested_threats.apply(lambda row: calculate_risk(row['likelihood'], row['impact']), axis=1))
         
         st.dataframe(df_suggested_threats[['name', 'category', 'likelihood', 'impact', 'risk_score', 'risk_level', 'boundary']], use_container_width=True)
 
@@ -1308,6 +1361,7 @@ def render_threat_model_dashboard():
         if st.button("Add Selected Threats"):
             added_count = 0
             for threat_name in threat_names_to_add:
+                # Find the threat from the already prepared suggested_threats list
                 threat_to_add = next((t for t in suggested_threats if t['name'] == threat_name), None)
                 if threat_to_add:
                     boundary_name = threat_to_add['boundary']
@@ -1327,8 +1381,8 @@ def render_threat_model_dashboard():
                             'category': threat_to_add['category'],
                             'likelihood': threat_to_add['likelihood'],
                             'impact': threat_to_add['impact'],
-                            'risk_score': threat_to_add['risk_score'],
-                            'risk_level': threat_to_add['risk_level'],
+                            'risk_score': threat_to_add['risk_score'], # These keys are now guaranteed to exist
+                            'risk_level': threat_to_add['risk_level'], # These keys are now guaranteed to exist
                             'mitigations': []
                         })
                         added_count += 1
