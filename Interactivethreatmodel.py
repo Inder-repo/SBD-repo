@@ -293,7 +293,49 @@ def calculate_risk(likelihood, impact):
 # Initial data structure for the threat model (default or loaded from session state)
 def get_initial_threat_data():
     return {
-        # Initial boundaries can be empty or pre-populated if desired
+        'Internet -> DMZ': {
+            'description': 'External users accessing web-facing components',
+            'components': ['Internet Users', 'Web Application Firewall', 'Load Balancer'],
+            'threats': [
+                {'id': 'T1.001', 'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'risk_score': 20, 'risk_level': 'Critical',
+                 'mitigations': [
+                     {'id': 'M1.001', 'type': 'Preventive', 'control': 'Extended Validation SSL certificates'},
+                     {'id': 'M1.002', 'type': 'Detective', 'control': 'Certificate transparency logs'}
+                 ]},
+                {'id': 'T1.002', 'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': 3, 'impact': 4, 'risk_score': 12, 'risk_level': 'High',
+                 'mitigations': [
+                     {'id': 'M1.003', 'type': 'Preventive', 'control': 'DDoS Protection Service'},
+                     {'id': 'M1.004', 'type': 'Responsive', 'control': 'Traffic throttling'}
+                 ]},
+            ]
+        },
+        'DMZ -> Internal App Tier': {
+            'description': 'Web tier to Application tier - Authenticated requests only',
+            'components': ['Web Servers (DMZ)', 'Application Servers', 'Authentication Services'],
+            'threats': [
+                {'id': 'T2.001', 'name': 'SQL Injection', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'risk_score': 15, 'risk_level': 'High',
+                 'mitigations': [
+                     {'id': 'M2.001', 'type': 'Preventive', 'control': 'Parameterized queries'},
+                     {'id': 'M2.002', 'type': 'Preventive', 'control': 'Input validation'}
+                 ]},
+                {'id': 'T2.002', 'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'risk_score': 10, 'risk_level': 'High',
+                 'mitigations': [
+                     {'id': 'M2.003', 'type': 'Preventive', 'control': 'Network segmentation'},
+                     {'id': 'M2.004', 'type': 'Detective', 'control': 'Network traffic analysis'}
+                 ]},
+            ]
+        },
+        'Internal App Tier -> Database': {
+            'description': 'Application servers accessing database',
+            'components': ['Application Servers', 'Database Server'],
+            'threats': [
+                {'id': 'T3.001', 'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 5, 'risk_score': 10, 'risk_level': 'High',
+                 'mitigations': [
+                     {'id': 'M3.001', 'type': 'Preventive', 'control': 'Data encryption at rest and in transit'},
+                     {'id': 'M3.002', 'type': 'Detective', 'control': 'Database activity monitoring'}
+                 ]},
+            ]
+        },
     }
 
 # Initialize session state for threat data
