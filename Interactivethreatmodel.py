@@ -18,6 +18,12 @@ st.set_page_config(
 # Custom CSS for styling
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+    body {
+        font-family: 'Inter', sans-serif;
+    }
+
     .main-header {
         background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
         color: white;
@@ -25,6 +31,7 @@ st.markdown("""
         border-radius: 10px;
         margin-bottom: 2rem;
         text-align: center;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
     }
     
     .boundary-card {
@@ -163,33 +170,39 @@ st.markdown("""
         background-color: #f9f9f9;
         overflow: hidden;
         position: relative;
-        height: 600px; /* Fixed height for the diagram */
+        height: 550px; /* Adjusted height to fit within Streamlit */
+        width: 100%;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
     #diagram-svg {
         width: 100%;
         height: 100%;
     }
-    .diagram-node {
+    .diagram-node-rect { /* Changed from .diagram-node */
         cursor: pointer;
         stroke: #333;
         stroke-width: 2px;
         transition: all 0.2s ease-in-out;
+        filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.1)); /* Drop shadow */
     }
-    .diagram-node:hover {
-        transform: scale(1.05);
+    .diagram-node-rect:hover {
+        transform: translateY(-3px);
         stroke: #2a5298;
+        filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.2));
     }
-    .diagram-node.selected {
+    .diagram-node-rect.selected {
         stroke: #667eea;
         stroke-width: 4px;
+        filter: drop-shadow(4px 4px 8px rgba(0,0,0,0.3));
     }
     .diagram-node-text {
-        font-family: sans-serif;
+        font-family: 'Inter', sans-serif;
         font-size: 12px;
         fill: #333;
-        pointer-events: none; /* Allows click to pass through to the circle */
+        pointer-events: none; /* Allows click to pass through to the rect */
         text-anchor: middle; /* Center text horizontally */
         dominant-baseline: central; /* Center text vertically */
+        font-weight: 600;
     }
     .diagram-edge {
         stroke: #764ba2;
@@ -198,37 +211,44 @@ st.markdown("""
         marker-end: url(#arrowhead);
     }
     .diagram-edge-label {
-        font-family: sans-serif;
+        font-family: 'Inter', sans-serif;
         font-size: 10px;
         fill: #555;
-        background-color: rgba(255,255,255,0.7);
-        padding: 2px 5px;
-        border-radius: 3px;
+        background-color: rgba(255,255,255,0.9); /* More opaque background */
+        padding: 3px 8px; /* Slightly larger padding */
+        border-radius: 5px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        font-weight: 500;
     }
     .diagram-controls {
         position: absolute;
-        top: 10px;
-        left: 10px;
+        top: 15px;
+        left: 15px;
         z-index: 10;
         display: flex;
+        flex-direction: column; /* Stack buttons vertically */
         gap: 10px;
     }
     .diagram-controls button {
-        background-color: #2a5298;
+        background-color: #007bff; /* Primary blue */
         color: white;
         border: none;
-        padding: 8px 15px;
-        border-radius: 5px;
+        padding: 10px 18px;
+        border-radius: 8px; /* More rounded */
         cursor: pointer;
         font-size: 14px;
-        transition: background-color 0.2s ease;
+        font-weight: 600;
+        transition: background-color 0.2s ease, transform 0.1s ease;
+        box-shadow: 0 3px 8px rgba(0,123,255,0.3);
     }
     .diagram-controls button:hover {
-        background-color: #1e3c72;
+        background-color: #0056b3; /* Darker blue on hover */
+        transform: translateY(-1px);
     }
     .diagram-controls button:disabled {
         background-color: #cccccc;
         cursor: not-allowed;
+        box-shadow: none;
     }
     .modal {
         display: none;
@@ -239,40 +259,83 @@ st.markdown("""
         width: 100%;
         height: 100%;
         overflow: auto;
-        background-color: rgba(0,0,0,0.4);
+        background-color: rgba(0,0,0,0.6); /* Darker overlay */
         justify-content: center;
         align-items: center;
     }
     .modal-content {
         background-color: #fefefe;
         margin: auto;
-        padding: 20px;
-        border-radius: 10px;
-        width: 80%;
-        max-width: 500px;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        padding: 30px; /* Larger padding */
+        border-radius: 15px; /* More rounded */
+        width: 90%;
+        max-width: 600px; /* Slightly wider */
+        box-shadow: 0 8px 25px rgba(0,0,0,0.3);
         display: flex;
         flex-direction: column;
-        gap: 15px;
+        gap: 20px; /* Larger gap */
+    }
+    .modal-content h2 {
+        color: #2a5298;
+        margin-top: 0;
+        font-size: 1.8em;
+    }
+    .modal-content label {
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 5px;
     }
     .modal-content input, .modal-content select, .modal-content textarea {
         width: calc(100% - 20px);
-        padding: 10px;
+        padding: 12px; /* Larger input fields */
         margin-top: 5px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
+        border: 1px solid #c0c0c0; /* Softer border */
+        border-radius: 8px;
+        font-size: 1em;
+    }
+    .modal-content textarea {
+        min-height: 80px;
+        resize: vertical;
     }
     .modal-content button {
         background-color: #28a745;
         color: white;
-        padding: 10px 20px;
+        padding: 12px 25px;
         border: none;
-        border-radius: 5px;
+        border-radius: 8px;
         cursor: pointer;
-        align-self: flex-end;
+        font-size: 1.05em;
+        font-weight: 600;
+        transition: background-color 0.2s ease;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
     }
     .modal-content button.cancel {
         background-color: #dc3545;
+    }
+    .modal-content button.cancel:hover {
+        background-color: #c82333;
+    }
+    .modal-content button:hover {
+        background-color: #218838;
+    }
+
+    /* Trust Boundary SVG styling */
+    .trust-boundary-rect {
+        fill: #e0f7fa; /* Light cyan */
+        fill-opacity: 0.4;
+        stroke: #007bff; /* Primary blue border */
+        stroke-width: 2px;
+        stroke-dasharray: 8 4; /* Dashed line */
+        rx: 10; /* Rounded corners */
+        ry: 10;
+        pointer-events: none; /* Do not block clicks on elements inside */
+    }
+    .trust-boundary-label {
+        font-family: 'Inter', sans-serif;
+        font-size: 14px;
+        fill: #0056b3; /* Darker blue text */
+        font-weight: 700;
+        pointer-events: none;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -292,6 +355,9 @@ def calculate_risk(likelihood, impact):
 
 # Initial data structure for the threat model (default or loaded from session state)
 def get_initial_threat_data(sample_name="Banking Application"):
+    if sample_name == "New Empty Model":
+        return {}
+    
     banking_threat_data = {
         # --- Banking Application Threats ---
         'Internet -> DMZ': {
@@ -402,6 +468,9 @@ def get_initial_threat_data(sample_name="Banking Application"):
 
 # Initial data structure for architecture (default or loaded from session state)
 def get_initial_architecture_data(sample_name="Banking Application"):
+    if sample_name == "New Empty Model":
+        return {'components': [], 'connections': []}
+
     banking_components = [
         # --- Banking Application Components ---
         {'id': 'customer_bank_id', 'name': 'Bank Customer', 'type': 'User', 'description': 'End-user of the banking application', 'x': 100, 'y': 100},
@@ -434,11 +503,11 @@ def get_initial_architecture_data(sample_name="Banking Application"):
     ]
     order_components = [
         # --- Online Order Processing Components ---
-        {'id': 'customer_order_id', 'name': 'Order Customer', 'type': 'User', 'description': 'End-user of the order system', 'x': 100, 'y': 400},
-        {'id': 'web_app_order_id', 'name': 'Web Application (Order)', 'type': 'Web Server', 'description': 'Online storefront for orders', 'x': 300, 'y': 400},
-        {'id': 'payment_gateway_order_id', 'name': 'Payment Gateway (Order)', 'type': 'External Service', 'description': 'Handles order payments', 'x': 500, 'y': 400},
-        {'id': 'order_db_id', 'name': 'Order Database', 'type': 'Database', 'description': 'Stores order details', 'x': 300, 'y': 500},
-        {'id': 'shipping_service_id', 'name': 'Shipping Service', 'type': 'External Service', 'description': 'Manages product shipment', 'x': 500, 'y': 500},
+        {'id': 'customer_order_id', 'name': 'Order Customer', 'type': 'User', 'description': 'End-user of the order system', 'x': 100, 'y': 100},
+        {'id': 'web_app_order_id', 'name': 'Web Application (Order)', 'type': 'Web Server', 'description': 'Online storefront for orders', 'x': 300, 'y': 100},
+        {'id': 'payment_gateway_order_id', 'name': 'Payment Gateway (Order)', 'type': 'External Service', 'description': 'Handles order payments', 'x': 500, 'y': 100},
+        {'id': 'order_db_id', 'name': 'Order Database', 'type': 'Database', 'description': 'Stores order details', 'x': 300, 'y': 250},
+        {'id': 'shipping_service_id', 'name': 'Shipping Service', 'type': 'External Service', 'description': 'Manages product shipment', 'x': 500, 'y': 250},
     ]
     order_connections = [
         # --- Online Order Processing Connections ---
@@ -461,9 +530,12 @@ if 'current_sample' not in st.session_state:
     st.session_state.current_sample = "Banking Application"
 
 # Initialize session state for threat data and architecture based on the current sample choice
-if 'threat_model' not in st.session_state or 'architecture' not in st.session_state:
+# This ensures that when the app first loads, it uses the default sample
+if 'threat_model' not in st.session_state:
     st.session_state.threat_model = get_initial_threat_data(st.session_state.current_sample)
+if 'architecture' not in st.session_state:
     st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
+
 
 def main():
     # Header
@@ -477,27 +549,42 @@ def main():
     # Sidebar for navigation
     st.sidebar.title("⚙️ Options")
 
-    # Sample selection radio button
-    sample_choice = st.sidebar.radio(
-        "Select Sample Application:",
-        ("Banking Application", "Online Order Processing"),
-        key="sample_selector"
+    # Navigation for different sections
+    app_mode = st.sidebar.radio(
+        "Go to",
+        ["Threat Model Dashboard", "Trust Boundary Details"],
+        key="app_mode_selector"
     )
 
-    # Update session state if sample choice changes
-    if st.session_state.current_sample != sample_choice:
-        st.session_state.current_sample = sample_choice
-        st.session_state.threat_model = get_initial_threat_data(sample_choice)
-        st.session_state.architecture = get_initial_architecture_data(sample_choice)
-        st.rerun() # Rerun to ensure data is loaded correctly
+    # Sample selection radio button
+    # This will trigger a rerun if the selection changes
+    selected_app_type = st.sidebar.radio(
+        "Select Application:",
+        ("New Empty Model", "Banking Application", "Online Order Processing"),
+        key="app_type_selector"
+    )
 
-    # Reset button
-    if st.sidebar.button(f"🔄 Reset '{st.session_state.current_sample}' Data"):
+    # Check if the selected application type has changed
+    if selected_app_type != st.session_state.current_sample:
+        st.session_state.current_sample = selected_app_type
+        # Reset data based on the newly selected sample type
+        st.session_state.threat_model = get_initial_threat_data(st.session_state.current_sample)
+        st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
+        st.rerun() # Rerun to load the new data
+
+    # Reset button - resets the CURRENTLY loaded model (either sample or empty)
+    if st.sidebar.button(f"🔄 Reset Current Model"):
         st.session_state.threat_model = get_initial_threat_data(st.session_state.current_sample)
         st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
         st.rerun()
-        st.success(f"Threat model and architecture data for '{st.session_state.current_sample}' reset!")
+        st.success(f"Current model data reset to '{st.session_state.current_sample}' defaults.")
 
+    if app_mode == "Threat Model Dashboard":
+        render_threat_model_dashboard()
+    elif app_mode == "Trust Boundary Details":
+        render_trust_boundary_details()
+
+def render_threat_model_dashboard():
     # --- Architecture Definition Section ---
     st.subheader("🏗️ 1. Define System Architecture")
     st.write("Interact with the diagram below to add components and define data flows. Changes will automatically update your threat model.")
@@ -518,32 +605,37 @@ def main():
                 position: relative;
                 height: 550px; /* Adjusted height to fit within Streamlit */
                 width: 100%;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
             }}
             #diagram-svg {{
                 width: 100%;
                 height: 100%;
             }}
-            .diagram-node {{
+            .diagram-node-rect {{ /* Changed from .diagram-node */
                 cursor: pointer;
                 stroke: #333;
                 stroke-width: 2px;
                 transition: all 0.2s ease-in-out;
+                filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.1)); /* Drop shadow */
             }}
-            .diagram-node:hover {{
-                transform: scale(1.05);
+            .diagram-node-rect:hover {{
+                transform: translateY(-3px);
                 stroke: #2a5298;
+                filter: drop-shadow(3px 3px 6px rgba(0,0,0,0.2));
             }}
-            .diagram-node.selected {{
+            .diagram-node-rect.selected {{
                 stroke: #667eea;
                 stroke-width: 4px;
+                filter: drop-shadow(4px 4px 8px rgba(0,0,0,0.3));
             }}
             .diagram-node-text {{
-                font-family: sans-serif;
+                font-family: 'Inter', sans-serif;
                 font-size: 12px;
                 fill: #333;
-                pointer-events: none;
-                text-anchor: middle;
-                dominant-baseline: central;
+                pointer-events: none; /* Allows click to pass through to the rect */
+                text-anchor: middle; /* Center text horizontally */
+                dominant-baseline: central; /* Center text vertically */
+                font-weight: 600;
             }}
             .diagram-edge {{
                 stroke: #764ba2;
@@ -552,38 +644,44 @@ def main():
                 marker-end: url(#arrowhead);
             }}
             .diagram-edge-label {{
-                font-family: sans-serif;
+                font-family: 'Inter', sans-serif;
                 font-size: 10px;
                 fill: #555;
-                background-color: rgba(255,255,255,0.7);
-                padding: 2px 5px;
-                border-radius: 3px;
+                background-color: rgba(255,255,255,0.9); /* More opaque background */
+                padding: 3px 8px; /* Slightly larger padding */
+                border-radius: 5px;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                font-weight: 500;
             }}
             .diagram-controls {{
                 position: absolute;
-                top: 10px;
-                left: 10px;
+                top: 15px;
+                left: 15px;
                 z-index: 10;
                 display: flex;
                 flex-direction: column; /* Stack buttons vertically */
                 gap: 10px;
             }}
             .diagram-controls button {{
-                background-color: #2a5298;
+                background-color: #007bff; /* Primary blue */
                 color: white;
                 border: none;
-                padding: 8px 15px;
-                border-radius: 5px;
+                padding: 10px 18px;
+                border-radius: 8px; /* More rounded */
                 cursor: pointer;
                 font-size: 14px;
-                transition: background-color 0.2s ease;
+                font-weight: 600;
+                transition: background-color 0.2s ease, transform 0.1s ease;
+                box-shadow: 0 3px 8px rgba(0,123,255,0.3);
             }}
             .diagram-controls button:hover {{
-                background-color: #1e3c72;
+                background-color: #0056b3; /* Darker blue on hover */
+                transform: translateY(-1px);
             }}
             .diagram-controls button:disabled {{
                 background-color: #cccccc;
                 cursor: not-allowed;
+                box-shadow: none;
             }}
             .modal {{
                 display: none;
@@ -594,40 +692,83 @@ def main():
                 width: 100%;
                 height: 100%;
                 overflow: auto;
-                background-color: rgba(0,0,0,0.4);
+                background-color: rgba(0,0,0,0.6); /* Darker overlay */
                 justify-content: center;
                 align-items: center;
             }}
             .modal-content {{
                 background-color: #fefefe;
                 margin: auto;
-                padding: 20px;
-                border-radius: 10px;
-                width: 80%;
-                max-width: 500px;
-                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                padding: 30px; /* Larger padding */
+                border-radius: 15px; /* More rounded */
+                width: 90%;
+                max-width: 600px; /* Slightly wider */
+                box-shadow: 0 8px 25px rgba(0,0,0,0.3);
                 display: flex;
                 flex-direction: column;
-                gap: 15px;
+                gap: 20px; /* Larger gap */
+            }}
+            .modal-content h2 {{
+                color: #2a5298;
+                margin-top: 0;
+                font-size: 1.8em;
+            }}
+            .modal-content label {{
+                font-weight: 600;
+                color: #333;
+                margin-bottom: 5px;
             }}
             .modal-content input, .modal-content select, .modal-content textarea {{
                 width: calc(100% - 20px);
-                padding: 10px;
+                padding: 12px; /* Larger input fields */
                 margin-top: 5px;
-                border: 1px solid #ddd;
-                border-radius: 5px;
+                border: 1px solid #c0c0c0; /* Softer border */
+                border-radius: 8px;
+                font-size: 1em;
+            }}
+            .modal-content textarea {{
+                min-height: 80px;
+                resize: vertical;
             }}
             .modal-content button {{
                 background-color: #28a745;
                 color: white;
-                padding: 10px 20px;
+                padding: 12px 25px;
                 border: none;
-                border-radius: 5px;
+                border-radius: 8px;
                 cursor: pointer;
-                align-self: flex-end;
+                font-size: 1.05em;
+                font-weight: 600;
+                transition: background-color 0.2s ease;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             }}
             .modal-content button.cancel {{
                 background-color: #dc3545;
+            }}
+            .modal-content button.cancel:hover {{
+                background-color: #c82333;
+            }}
+            .modal-content button:hover {{
+                background-color: #218838;
+            }}
+
+            /* Trust Boundary SVG styling */
+            .trust-boundary-rect {{
+                fill: #e0f7fa; /* Light cyan */
+                fill-opacity: 0.4;
+                stroke: #007bff; /* Primary blue border */
+                stroke-width: 2px;
+                stroke-dasharray: 8 4; /* Dashed line */
+                rx: 10; /* Rounded corners */
+                ry: 10;
+                pointer-events: none; /* Do not block clicks on elements inside */
+            }}
+            .trust-boundary-label {{
+                font-family: 'Inter', sans-serif;
+                font-size: 14px;
+                fill: #0056b3; /* Darker blue text */
+                font-weight: 700;
+                pointer-events: none;
             }}
         </style>
     </head>
@@ -735,21 +876,30 @@ def main():
                     </defs>
                 `; // Clear and redraw
                 
+                // Define node width and height
+                const nodeWidth = 100;
+                const nodeHeight = 60;
+
+                // Draw trust boundaries first (behind other elements)
+                drawTrustBoundaries();
+
                 // Draw nodes
                 nodes.forEach(node => {{
-                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-                    circle.setAttribute('cx', node.x);
-                    circle.setAttribute('cy', node.y);
-                    circle.setAttribute('r', 30);
-                    // Corrected line: Escaping inner curly braces for Python's f-string
-                    circle.setAttribute('class', `diagram-node ${{selectedNode && selectedNode.id === node.id ? 'selected' : ''}}`);
-                    circle.setAttribute('fill', getNodeColor(node.type));
-                    circle.dataset.nodeId = node.id;
-                    circle.addEventListener('click', (event) => {{
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', node.x - nodeWidth / 2);
+                    rect.setAttribute('y', node.y - nodeHeight / 2);
+                    rect.setAttribute('width', nodeWidth);
+                    rect.setAttribute('height', nodeHeight);
+                    rect.setAttribute('rx', 10); // Rounded corners
+                    rect.setAttribute('ry', 10);
+                    rect.setAttribute('class', `diagram-node-rect ${{selectedNode && selectedNode.id === node.id ? 'selected' : ''}}`);
+                    rect.setAttribute('fill', getNodeColor(node.type));
+                    rect.dataset.nodeId = node.id;
+                    rect.addEventListener('click', (event) => {{
                         event.stopPropagation(); // Prevent SVG click
                         selectNode(node.id);
                     }});
-                    svg.appendChild(circle);
+                    svg.appendChild(rect);
 
                     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                     text.setAttribute('x', node.x);
@@ -765,17 +915,36 @@ def main():
                     const targetNode = nodes.find(n => n.id === conn.target_id);
 
                     if (sourceNode && targetNode) {{
+                        // Calculate start and end points for the line to connect to the edge of the rect
+                        const startX = sourceNode.x;
+                        const startY = sourceNode.y;
+                        const endX = targetNode.x;
+                        const endY = targetNode.y;
+
+                        // Simple vector from source to target
+                        const dx = endX - startX;
+                        const dy = endY - startY;
+                        const angle = Math.atan2(dy, dx);
+
+                        // Adjust start/end points to be on the rectangle perimeter
+                        // This is a simplified approach, a more robust solution would involve geometry
+                        const adjustedStartX = startX + Math.cos(angle) * (nodeWidth / 2);
+                        const adjustedStartY = startY + Math.sin(angle) * (nodeHeight / 2);
+                        const adjustedEndX = endX - Math.cos(angle) * (nodeWidth / 2);
+                        const adjustedEndY = endY - Math.sin(angle) * (nodeHeight / 2);
+
+
                         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                        line.setAttribute('x1', sourceNode.x);
-                        line.setAttribute('y1', sourceNode.y);
-                        line.setAttribute('x2', targetNode.x);
-                        line.setAttribute('y2', targetNode.y);
+                        line.setAttribute('x1', adjustedStartX);
+                        line.setAttribute('y1', adjustedStartY);
+                        line.setAttribute('x2', adjustedEndX);
+                        line.setAttribute('y2', adjustedEndY);
                         line.setAttribute('class', 'diagram-edge');
                         svg.appendChild(line);
 
                         // Add label for the edge
-                        const midX = (sourceNode.x + targetNode.x) / 2;
-                        const midY = (sourceNode.y + targetNode.y) / 2;
+                        const midX = (adjustedStartX + adjustedEndX) / 2;
+                        const midY = (adjustedStartY + adjustedEndY) / 2;
                         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                         text.setAttribute('x', midX);
                         text.setAttribute('y', midY - 10); // Offset text slightly
@@ -787,26 +956,59 @@ def main():
                 updateDeleteButtonState();
             }}
 
+            function drawTrustBoundaries() {{
+                // This is a simplified representation of trust boundaries for teaching.
+                // In a real tool, this would be more complex, potentially using bounding boxes
+                // of associated components or user-defined areas.
+                const boundaries = {{
+                    'Internet -> DMZ': {{x: 50, y: 20, width: 700, height: 250, label: 'Internet / DMZ Boundary'}},
+                    'DMZ -> Internal App Tier': {{x: 450, y: 20, width: 700, height: 300, label: 'DMZ / Internal App Boundary'}},
+                    'Internal App Tier -> Database': {{x: 750, y: 50, width: 300, height: 200, label: 'App / DB Boundary'}},
+                    'Customer-Web App Boundary': {{x: 50, y: 350, width: 400, height: 200, label: 'Customer / Web App Boundary'}},
+                    'Web App-Payment Gateway Boundary': {{x: 400, y: 350, width: 300, height: 200, label: 'Web App / Payment Gateway Boundary'}},
+                    'Web App-Database Boundary': {{x: 200, y: 400, width: 300, height: 200, label: 'Web App / Order DB Boundary'}},
+                    'Web App-Shipping Service Boundary': {{x: 400, y: 400, width: 300, height: 200, label: 'Web App / Shipping Service Boundary'}}
+                }};
+
+                Object.keys(boundaries).forEach(key => {{
+                    const boundary = boundaries[key];
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', boundary.x);
+                    rect.setAttribute('y', boundary.y);
+                    rect.setAttribute('width', boundary.width);
+                    rect.setAttribute('height', boundary.height);
+                    rect.setAttribute('class', 'trust-boundary-rect');
+                    svg.appendChild(rect);
+
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', boundary.x + 10);
+                    text.setAttribute('y', boundary.y + 20);
+                    text.setAttribute('class', 'trust-boundary-label');
+                    text.textContent = boundary.label;
+                    svg.appendChild(text);
+                }});
+            }}
+
+
             function getNodeColor(type) {{
                 switch(type) {{
-                    case 'User': return '#ff6b6b'; // external
-                    case 'Web Server':
-                    case 'Load Balancer':
-                    case 'Firewall': return '#4ecdc4'; // security/presentation
-                    case 'Application Server': return '#96ceb4'; // application
-                    case 'Database':
-                    case 'Core Banking System': return '#ffeaa7'; // data
-                    case 'API Gateway':
-                    case 'Authentication Service': return '#45b7d1'; // presentation/security
-                    case 'External Service': return '#fd79a8'; // integration
-                    default: return 'lightgray'; // other
+                    case 'User': return '#ff6b6b'; // external - Red
+                    case 'Web Server': return '#4ecdc4'; // security/presentation - Teal
+                    case 'Load Balancer': return '#4ecdc4'; // security/presentation - Teal
+                    case 'Firewall': return '#4ecdc4'; // security/presentation - Teal
+                    case 'Application Server': return '#96ceb4'; // application - Green
+                    case 'Database': return '#ffeaa7'; // data - Light Yellow
+                    case 'Core Banking System': return '#ffeaa7'; // data - Light Yellow
+                    case 'API Gateway': return '#45b7d1'; // presentation/security - Light Blue
+                    case 'Authentication Service': return '#45b7d1'; // presentation/security - Light Blue
+                    case 'External Service': return '#fd79a8'; // integration - Pink
+                    default: return '#cccccc'; // other - Grey
                 }}
             }}
 
             function selectNode(nodeId) {{
                 nodes.forEach(node => {{
-                    // Corrected line: Escaping inner curly braces for Python's f-string
-                    const element = svg.querySelector(`circle[data-node-id="${{node.id}}"]`);
+                    const element = svg.querySelector(`rect[data-node-id="${{node.id}}"]`); // Changed to rect
                     if (element) {{
                         if (node.id === nodeId) {{
                             selectedNode = node;
@@ -1192,7 +1394,7 @@ def main():
                 <div class="mitigation-list">
                     <h4>Mitigation Controls:</h4>
                     <ul>
-                        {''.join([f'<li>{m["type"]}: {m["control"]}</li>' for m in threat['mitigations']]) if threat['mitigations'] else '<li>No mitigations defined yet.</li>'}
+                        {''.join([f'<li>{m["type"]}: {m["control']}</li>' for m in threat['mitigations']]) if threat['mitigations'] else '<li>No mitigations defined yet.</li>'}
                     </ul>
                 </div>
             </div>
@@ -1206,7 +1408,7 @@ def main():
     st.subheader("Detailed Threat & Mitigation Editor")
     
     # Create a unique list of all threats for selection
-    all_threat_names_for_editor = [f"{t['name']} ({t['boundary']})" for t in all_threats_flat]
+    all_threats_flat = [f"{t['name']} ({t['boundary']})" for t in all_threats_flat]
     selected_threat_for_editor_display = st.selectbox(
         "Select a Threat to Edit Mitigations or Details",
         ["-- Select --"] + all_threat_names_for_editor,
@@ -1295,6 +1497,48 @@ def main():
                 st.info("No mitigations added for this threat yet.")
     else:
         st.info("Select a threat above to manage its details and mitigations.")
+
+def render_trust_boundary_details():
+    st.subheader("🌐 Trust Boundary Details")
+    st.write("Explore the security posture of each defined trust boundary, including associated threats, risks, and mitigations.")
+
+    if not st.session_state.threat_model:
+        st.info("No trust boundaries defined in the current threat model. Please define architecture components and connections first.")
+        return
+
+    for boundary_name, boundary_data in st.session_state.threat_model.items():
+        with st.expander(f"### Trust Boundary: {boundary_name}"):
+            st.markdown(f"**Description:** {boundary_data.get('description', 'No description provided.')}")
+            
+            # Display associated components (if any are explicitly linked in threat_model)
+            if boundary_data.get('components'):
+                st.markdown(f"**Associated Components:** {', '.join(boundary_data['components'])}")
+            else:
+                st.markdown("**Associated Components:** None explicitly linked in threat model data. (Refer to Architecture Diagram for context)")
+
+            st.markdown("---")
+            st.markdown("#### Threats within this Boundary:")
+
+            if boundary_data['threats']:
+                for threat in boundary_data['threats']:
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.markdown(f"**Threat Name:** {threat['name']}")
+                        st.markdown(f"**STRIDE Category:** {threat['category']}")
+                        st.markdown(f"**Likelihood:** {threat['likelihood']}/5 | **Impact:** {threat['impact']}/5")
+                    with col2:
+                        risk_level_class = threat['risk_level'].lower()
+                        st.markdown(f"<div class='risk-score-display {risk_level_class}'>{threat['risk_level'].upper()} ({threat['risk_score']})</div>", unsafe_allow_html=True)
+                    
+                    st.markdown("##### Mitigations:")
+                    if threat['mitigations']:
+                        for mitigation in threat['mitigations']:
+                            st.markdown(f"- **{mitigation['type']}**: {mitigation['control']}")
+                    else:
+                        st.info("No mitigations defined for this threat.")
+                    st.markdown("---") # Separator for threats within a boundary
+            else:
+                st.info("No threats defined for this trust boundary yet.")
 
 if __name__ == "__main__":
     main()
