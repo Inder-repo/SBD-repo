@@ -291,8 +291,8 @@ def calculate_risk(likelihood, impact):
     return risk_score, risk_level
 
 # Initial data structure for the threat model (default or loaded from session state)
-def get_initial_threat_data():
-    return {
+def get_initial_threat_data(sample_name="Banking Application"):
+    banking_threat_data = {
         # --- Banking Application Threats ---
         'Internet -> DMZ': {
             'description': 'External users accessing web-facing components of the banking application',
@@ -337,6 +337,8 @@ def get_initial_threat_data():
                  ]},
             ]
         },
+    }
+    order_processing_threat_data = {
         # --- Online Order Processing Threats ---
         'Customer-Web App Boundary': {
             'description': 'Customer interaction with the online order processing web application.',
@@ -392,64 +394,76 @@ def get_initial_threat_data():
             'threats': [] # No specific threats for this boundary in the HTML sample, but it's defined.
         }
     }
+    if sample_name == "Banking Application":
+        return banking_threat_data
+    elif sample_name == "Online Order Processing":
+        return order_processing_threat_data
+    return {} # Default empty
 
 # Initial data structure for architecture (default or loaded from session state)
-def get_initial_architecture_data():
-    return {
-        'components': [
-            # --- Banking Application Components ---
-            {'id': 'customer_bank_id', 'name': 'Bank Customer', 'type': 'User', 'description': 'End-user of the banking application', 'x': 100, 'y': 100},
-            {'id': 'waf_id', 'name': 'WAF', 'type': 'Firewall', 'description': 'Web Application Firewall', 'x': 300, 'y': 50},
-            {'id': 'load_balancer_id', 'name': 'Load Balancer', 'type': 'Load Balancer', 'description': 'Distributes traffic', 'x': 300, 'y': 150},
-            {'id': 'web_server_id', 'name': 'Web Server (Bank)', 'type': 'Web Server', 'description': 'Serves banking web pages', 'x': 500, 'y': 100},
-            {'id': 'login_comp_id', 'name': 'Login Component', 'type': 'Application Server', 'description': 'Handles user authentication', 'x': 500, 'y': 200},
-            {'id': 'app_server_bank_id', 'name': 'App Server (Bank)', 'type': 'Application Server', 'description': 'Banking business logic', 'x': 700, 'y': 100},
-            {'id': 'auth_service_id', 'name': 'Auth Service', 'type': 'Authentication Service', 'description': 'External authentication provider', 'x': 700, 'y': 200},
-            {'id': 'db_server_bank_id', 'name': 'DB Server (Bank)', 'type': 'Database', 'description': 'Stores banking data', 'x': 900, 'y': 100},
-            {'id': 'core_banking_id', 'name': 'Core Banking System', 'type': 'Core Banking System', 'description': 'Main banking ledger', 'x': 900, 'y': 200},
-            {'id': 'payment_proc_id', 'name': 'Payment Processor', 'type': 'External Service', 'description': 'Third-party payment service', 'x': 1100, 'y': 50},
-            {'id': 'sms_email_id', 'name': 'SMS/Email Service', 'type': 'External Service', 'description': 'Notification service', 'x': 1100, 'y': 150},
-            {'id': 'credit_bureau_id', 'name': 'Credit Bureau', 'type': 'External Service', 'description': 'Credit check service', 'x': 1100, 'y': 250},
+def get_initial_architecture_data(sample_name="Banking Application"):
+    banking_components = [
+        # --- Banking Application Components ---
+        {'id': 'customer_bank_id', 'name': 'Bank Customer', 'type': 'User', 'description': 'End-user of the banking application', 'x': 100, 'y': 100},
+        {'id': 'waf_id', 'name': 'WAF', 'type': 'Firewall', 'description': 'Web Application Firewall', 'x': 300, 'y': 50},
+        {'id': 'load_balancer_id', 'name': 'Load Balancer', 'type': 'Load Balancer', 'description': 'Distributes traffic', 'x': 300, 'y': 150},
+        {'id': 'web_server_id', 'name': 'Web Server (Bank)', 'type': 'Web Server', 'description': 'Serves banking web pages', 'x': 500, 'y': 100},
+        {'id': 'login_comp_id', 'name': 'Login Component', 'type': 'Application Server', 'description': 'Handles user authentication', 'x': 500, 'y': 200},
+        {'id': 'app_server_bank_id', 'name': 'App Server (Bank)', 'type': 'Application Server', 'description': 'Banking business logic', 'x': 700, 'y': 100},
+        {'id': 'auth_service_id', 'name': 'Auth Service', 'type': 'Authentication Service', 'description': 'External authentication provider', 'x': 700, 'y': 200},
+        {'id': 'db_server_bank_id', 'name': 'DB Server (Bank)', 'type': 'Database', 'description': 'Stores banking data', 'x': 900, 'y': 100},
+        {'id': 'core_banking_id', 'name': 'Core Banking System', 'type': 'Core Banking System', 'description': 'Main banking ledger', 'x': 900, 'y': 200},
+        {'id': 'payment_proc_id', 'name': 'Payment Processor', 'type': 'External Service', 'description': 'Third-party payment service', 'x': 1100, 'y': 50},
+        {'id': 'sms_email_id', 'name': 'SMS/Email Service', 'type': 'External Service', 'description': 'Notification service', 'x': 1100, 'y': 150},
+        {'id': 'credit_bureau_id', 'name': 'Credit Bureau', 'type': 'External Service', 'description': 'Credit check service', 'x': 1100, 'y': 250},
+    ]
+    banking_connections = [
+        # --- Banking Application Connections ---
+        {'id': 'conn_bank_1', 'source_id': 'customer_bank_id', 'target_id': 'waf_id', 'data_flow': 'HTTP/S', 'description': 'Customer traffic to WAF', 'trust_boundary_crossing': 'Internet -> DMZ'},
+        {'id': 'conn_bank_2', 'source_id': 'customer_bank_id', 'target_id': 'load_balancer_id', 'data_flow': 'HTTP/S', 'description': 'Customer traffic to Load Balancer', 'trust_boundary_crossing': 'Internet -> DMZ'},
+        {'id': 'conn_bank_3', 'source_id': 'waf_id', 'target_id': 'web_server_id', 'data_flow': 'HTTP/S', 'description': 'WAF to Web Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+        {'id': 'conn_bank_4', 'source_id': 'load_balancer_id', 'target_id': 'web_server_id', 'data_flow': 'HTTP/S', 'description': 'Load Balancer to Web Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+        {'id': 'conn_bank_5', 'source_id': 'web_server_id', 'target_id': 'app_server_bank_id', 'data_flow': 'API Call', 'description': 'Web Server to App Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+        {'id': 'conn_bank_6', 'source_id': 'web_server_id', 'target_id': 'login_comp_id', 'data_flow': 'Internal API', 'description': 'Web Server to Login Component', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+        {'id': 'conn_bank_7', 'source_id': 'login_comp_id', 'target_id': 'auth_service_id', 'data_flow': 'Auth API', 'description': 'Login Component to Auth Service', 'trust_boundary_crossing': 'Internal App Tier -> External Auth'},
+        {'id': 'conn_bank_8', 'source_id': 'app_server_bank_id', 'target_id': 'db_server_bank_id', 'data_flow': 'DB Connection', 'description': 'App Server to DB Server', 'trust_boundary_crossing': 'Internal App Tier -> Database'},
+        {'id': 'conn_bank_9', 'source_id': 'app_server_bank_id', 'target_id': 'core_banking_id', 'data_flow': 'Core API', 'description': 'App Server to Core Banking', 'trust_boundary_crossing': 'Internal App Tier -> Core System'},
+        {'id': 'conn_bank_10', 'source_id': 'app_server_bank_id', 'target_id': 'payment_proc_id', 'data_flow': 'Payment API', 'description': 'App Server to Payment Processor', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
+        {'id': 'conn_bank_11', 'source_id': 'app_server_bank_id', 'target_id': 'sms_email_id', 'data_flow': 'Messaging API', 'description': 'App Server to SMS/Email Service', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
+        {'id': 'conn_bank_12', 'source_id': 'app_server_bank_id', 'target_id': 'credit_bureau_id', 'data_flow': 'Credit Check API', 'description': 'App Server to Credit Bureau', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
+    ]
+    order_components = [
+        # --- Online Order Processing Components ---
+        {'id': 'customer_order_id', 'name': 'Order Customer', 'type': 'User', 'description': 'End-user of the order system', 'x': 100, 'y': 400},
+        {'id': 'web_app_order_id', 'name': 'Web Application (Order)', 'type': 'Web Server', 'description': 'Online storefront for orders', 'x': 300, 'y': 400},
+        {'id': 'payment_gateway_order_id', 'name': 'Payment Gateway (Order)', 'type': 'External Service', 'description': 'Handles order payments', 'x': 500, 'y': 400},
+        {'id': 'order_db_id', 'name': 'Order Database', 'type': 'Database', 'description': 'Stores order details', 'x': 300, 'y': 500},
+        {'id': 'shipping_service_id', 'name': 'Shipping Service', 'type': 'External Service', 'description': 'Manages product shipment', 'x': 500, 'y': 500},
+    ]
+    order_connections = [
+        # --- Online Order Processing Connections ---
+        {'id': 'conn_order_1', 'source_id': 'customer_order_id', 'target_id': 'web_app_order_id', 'data_flow': 'Order Details', 'description': 'Customer submits order via web app', 'trust_boundary_crossing': 'Customer-Web App Boundary'},
+        {'id': 'conn_order_2', 'source_id': 'web_app_order_id', 'target_id': 'payment_gateway_order_id', 'data_flow': 'Payment Request', 'description': 'Web app sends payment request to gateway', 'trust_boundary_crossing': 'Web App-Payment Gateway Boundary'},
+        {'id': 'conn_order_3', 'source_id': 'payment_gateway_order_id', 'target_id': 'web_app_order_id', 'data_flow': 'Payment Confirmation', 'description': 'Payment gateway confirms payment to web app', 'trust_boundary_crossing': 'Web App-Payment Gateway Boundary'},
+        {'id': 'conn_order_4', 'source_id': 'web_app_order_id', 'target_id': 'order_db_id', 'data_flow': 'Store Order', 'description': 'Web app stores order in database', 'trust_boundary_crossing': 'Web App-Database Boundary'},
+        {'id': 'conn_order_5', 'source_id': 'web_app_order_id', 'target_id': 'shipping_service_id', 'data_flow': 'Shipment Request', 'description': 'Web app requests shipment from service', 'trust_boundary_crossing': 'Web App-Shipping Service Boundary'},
+        {'id': 'conn_order_6', 'source_id': 'order_db_id', 'target_id': 'web_app_order_id', 'data_flow': 'Order Status', 'description': 'Web app retrieves order status from database', 'trust_boundary_crossing': 'Web App-Database Boundary'},
+    ]
 
-            # --- Online Order Processing Components ---
-            {'id': 'customer_order_id', 'name': 'Order Customer', 'type': 'User', 'description': 'End-user of the order system', 'x': 100, 'y': 400},
-            {'id': 'web_app_order_id', 'name': 'Web Application (Order)', 'type': 'Web Server', 'description': 'Online storefront for orders', 'x': 300, 'y': 400},
-            {'id': 'payment_gateway_order_id', 'name': 'Payment Gateway (Order)', 'type': 'External Service', 'description': 'Handles order payments', 'x': 500, 'y': 400},
-            {'id': 'order_db_id', 'name': 'Order Database', 'type': 'Database', 'description': 'Stores order details', 'x': 300, 'y': 500},
-            {'id': 'shipping_service_id', 'name': 'Shipping Service', 'type': 'External Service', 'description': 'Manages product shipment', 'x': 500, 'y': 500},
-        ],
-        'connections': [
-            # --- Banking Application Connections ---
-            {'id': 'conn_bank_1', 'source_id': 'customer_bank_id', 'target_id': 'waf_id', 'data_flow': 'HTTP/S', 'description': 'Customer traffic to WAF', 'trust_boundary_crossing': 'Internet -> DMZ'},
-            {'id': 'conn_bank_2', 'source_id': 'customer_bank_id', 'target_id': 'load_balancer_id', 'data_flow': 'HTTP/S', 'description': 'Customer traffic to Load Balancer', 'trust_boundary_crossing': 'Internet -> DMZ'},
-            {'id': 'conn_bank_3', 'source_id': 'waf_id', 'target_id': 'web_server_id', 'data_flow': 'HTTP/S', 'description': 'WAF to Web Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
-            {'id': 'conn_bank_4', 'source_id': 'load_balancer_id', 'target_id': 'web_server_id', 'data_flow': 'HTTP/S', 'description': 'Load Balancer to Web Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
-            {'id': 'conn_bank_5', 'source_id': 'web_server_id', 'target_id': 'app_server_bank_id', 'data_flow': 'API Call', 'description': 'Web Server to App Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
-            {'id': 'conn_bank_6', 'source_id': 'web_server_id', 'target_id': 'login_comp_id', 'data_flow': 'Internal API', 'description': 'Web Server to Login Component', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
-            {'id': 'conn_bank_7', 'source_id': 'login_comp_id', 'target_id': 'auth_service_id', 'data_flow': 'Auth API', 'description': 'Login Component to Auth Service', 'trust_boundary_crossing': 'Internal App Tier -> External Auth'},
-            {'id': 'conn_bank_8', 'source_id': 'app_server_bank_id', 'target_id': 'db_server_bank_id', 'data_flow': 'DB Connection', 'description': 'App Server to DB Server', 'trust_boundary_crossing': 'Internal App Tier -> Database'},
-            {'id': 'conn_bank_9', 'source_id': 'app_server_bank_id', 'target_id': 'core_banking_id', 'data_flow': 'Core API', 'description': 'App Server to Core Banking', 'trust_boundary_crossing': 'Internal App Tier -> Core System'},
-            {'id': 'conn_bank_10', 'source_id': 'app_server_bank_id', 'target_id': 'payment_proc_id', 'data_flow': 'Payment API', 'description': 'App Server to Payment Processor', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
-            {'id': 'conn_bank_11', 'source_id': 'app_server_bank_id', 'target_id': 'sms_email_id', 'data_flow': 'Messaging API', 'description': 'App Server to SMS/Email Service', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
-            {'id': 'conn_bank_12', 'source_id': 'app_server_bank_id', 'target_id': 'credit_bureau_id', 'data_flow': 'Credit Check API', 'description': 'App Server to Credit Bureau', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
+    if sample_name == "Banking Application":
+        return {'components': banking_components, 'connections': banking_connections}
+    elif sample_name == "Online Order Processing":
+        return {'components': order_components, 'connections': order_connections}
+    return {'components': [], 'connections': []} # Default empty
 
-            # --- Online Order Processing Connections ---
-            {'id': 'conn_order_1', 'source_id': 'customer_order_id', 'target_id': 'web_app_order_id', 'data_flow': 'Order Details', 'description': 'Customer submits order via web app', 'trust_boundary_crossing': 'Customer-Web App Boundary'},
-            {'id': 'conn_order_2', 'source_id': 'web_app_order_id', 'target_id': 'payment_gateway_order_id', 'data_flow': 'Payment Request', 'description': 'Web app sends payment request to gateway', 'trust_boundary_crossing': 'Web App-Payment Gateway Boundary'},
-            {'id': 'conn_order_3', 'source_id': 'payment_gateway_order_id', 'target_id': 'web_app_order_id', 'data_flow': 'Payment Confirmation', 'description': 'Payment gateway confirms payment to web app', 'trust_boundary_crossing': 'Web App-Payment Gateway Boundary'},
-            {'id': 'conn_order_4', 'source_id': 'web_app_order_id', 'target_id': 'order_db_id', 'data_flow': 'Store Order', 'description': 'Web app stores order in database', 'trust_boundary_crossing': 'Web App-Database Boundary'},
-            {'id': 'conn_order_5', 'source_id': 'web_app_order_id', 'target_id': 'shipping_service_id', 'data_flow': 'Shipment Request', 'description': 'Web app requests shipment from service', 'trust_boundary_crossing': 'Web App-Shipping Service Boundary'},
-            {'id': 'conn_order_6', 'source_id': 'order_db_id', 'target_id': 'web_app_order_id', 'data_flow': 'Order Status', 'description': 'Web app retrieves order status from database', 'trust_boundary_crossing': 'Web App-Database Boundary'},
-        ]
-    }
+# Initialize session state for sample choice if not already set
+if 'current_sample' not in st.session_state:
+    st.session_state.current_sample = "Banking Application"
 
-# Initialize session state for threat data
-if 'threat_model' not in st.session_state:
-    st.session_state.threat_model = get_initial_threat_data()
-
-# Initialize session state for architecture data
-if 'architecture' not in st.session_state:
-    st.session_state.architecture = get_initial_architecture_data()
+# Initialize session state for threat data and architecture based on the current sample choice
+if 'threat_model' not in st.session_state or 'architecture' not in st.session_state:
+    st.session_state.threat_model = get_initial_threat_data(st.session_state.current_sample)
+    st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
 
 def main():
     # Header
@@ -462,13 +476,27 @@ def main():
     
     # Sidebar for navigation
     st.sidebar.title("⚙️ Options")
-    
+
+    # Sample selection radio button
+    sample_choice = st.sidebar.radio(
+        "Select Sample Application:",
+        ("Banking Application", "Online Order Processing"),
+        key="sample_selector"
+    )
+
+    # Update session state if sample choice changes
+    if st.session_state.current_sample != sample_choice:
+        st.session_state.current_sample = sample_choice
+        st.session_state.threat_model = get_initial_threat_data(sample_choice)
+        st.session_state.architecture = get_initial_architecture_data(sample_choice)
+        st.rerun() # Rerun to ensure data is loaded correctly
+
     # Reset button
-    if st.sidebar.button("🔄 Reset All Data"):
-        st.session_state.threat_model = get_initial_threat_data()
-        st.session_state.architecture = get_initial_architecture_data()
+    if st.sidebar.button(f"🔄 Reset '{st.session_state.current_sample}' Data"):
+        st.session_state.threat_model = get_initial_threat_data(st.session_state.current_sample)
+        st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
         st.rerun()
-        st.success("Threat model and architecture data reset!")
+        st.success(f"Threat model and architecture data for '{st.session_state.current_sample}' reset!")
 
     # --- Architecture Definition Section ---
     st.subheader("🏗️ 1. Define System Architecture")
