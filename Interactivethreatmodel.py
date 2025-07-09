@@ -10,7 +10,7 @@ import json # For passing data between Python and JavaScript
 # Page configuration
 st.set_page_config(
     page_title="Threat Model",
-    page_icon="🏦",
+    page_icon="�",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -45,7 +45,7 @@ st.markdown("""
     }
     
     .mitigation-item {
-        background: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 0.1);
         padding: 0.8rem;
         border-radius: 8px;
         margin-bottom: 0.5rem;
@@ -188,6 +188,8 @@ st.markdown("""
         font-size: 12px;
         fill: #333;
         pointer-events: none; /* Allows click to pass through to the circle */
+        text-anchor: middle; /* Center text horizontally */
+        dominant-baseline: central; /* Center text vertically */
     }
     .diagram-edge {
         stroke: #764ba2;
@@ -227,6 +229,50 @@ st.markdown("""
     .diagram-controls button:disabled {
         background-color: #cccccc;
         cursor: not-allowed;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 100;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.4);
+        justify-content: center;
+        align-items: center;
+    }
+    .modal-content {
+        background-color: #fefefe;
+        margin: auto;
+        padding: 20px;
+        border-radius: 10px;
+        width: 80%;
+        max-width: 500px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    .modal-content input, .modal-content select, .modal-content textarea {
+        width: calc(100% - 20px);
+        padding: 10px;
+        margin-top: 5px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+    }
+    .modal-content button {
+        background-color: #28a745;
+        color: white;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        align-self: flex-end;
+    }
+    .modal-content button.cancel {
+        background-color: #dc3545;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -520,7 +566,8 @@ def main():
                     circle.setAttribute('cx', node.x);
                     circle.setAttribute('cy', node.y);
                     circle.setAttribute('r', 30);
-                    circle.setAttribute('class', 'diagram-node' + (selectedNode && selectedNode.id === node.id ? ' selected' : ''));
+                    // Corrected line: Escaping inner curly braces for Python's f-string
+                    circle.setAttribute('class', `diagram-node ${{selectedNode && selectedNode.id === node.id ? 'selected' : ''}}`);
                     circle.setAttribute('fill', getNodeColor(node.type));
                     circle.dataset.nodeId = node.id;
                     circle.addEventListener('click', (event) => {{
@@ -583,7 +630,8 @@ def main():
 
             function selectNode(nodeId) {{
                 nodes.forEach(node => {{
-                    const element = svg.querySelector(`circle[data-node-id="${node.id}"]`);
+                    // Corrected line: Escaping inner curly braces for Python's f-string
+                    const element = svg.querySelector(`circle[data-node-id="${{node.id}}"]`);
                     if (element) {{
                         if (node.id === nodeId) {{
                             selectedNode = node;
@@ -683,7 +731,7 @@ def main():
             // Delete Logic
             document.getElementById('deleteSelectedBtn').addEventListener('click', () => {{
                 if (selectedNode) {{
-                    if (confirm(`Are you sure you want to delete component "${selectedNode.name}" and its associated connections?`)) {{
+                    if (confirm(`Are you sure you want to delete component "${{selectedNode.name}}" and its associated connections?`)) {{
                         nodes = nodes.filter(n => n.id !== selectedNode.id);
                         connections = connections.filter(c => c.source_id !== selectedNode.id && c.target_id !== selectedNode.id);
                         selectedNode = null;
