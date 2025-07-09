@@ -949,14 +949,27 @@ def display_architecture_and_suggest_threats():
                     if source_name and target_name and data_flow_type and source_name != target_name:
                         source_id = component_options[source_name]
                         target_id = component_options[target_name]
+                        trust_boundary = trust_boundary_crossing.strip() # Get the input, strip whitespace
+                        
+                        # Add connection to architecture
                         st.session_state.architecture['connections'].append({
                             'id': str(uuid.uuid4()),
                             'source_id': source_id,
                             'target_id': target_id,
                             'data_flow': data_flow_type,
                             'description': conn_description,
-                            'trust_boundary_crossing': trust_boundary_crossing if trust_boundary_crossing else "N/A"
+                            'trust_boundary_crossing': trust_boundary if trust_boundary else "N/A"
                         })
+
+                        # Automated Trust Boundary Creation based on connection
+                        if trust_boundary and trust_boundary != "N/A" and trust_boundary not in st.session_state.threat_model:
+                            st.session_state.threat_model[trust_boundary] = {
+                                'description': f"Automatically created from architecture diagram connection: {source_name} -> {target_name} via {data_flow_type}",
+                                'components': [], # Components can be manually added or linked later
+                                'threats': []
+                            }
+                            st.success(f"New Trust Boundary '{trust_boundary}' automatically added to your threat model!")
+
                         st.success(f"Connection from '{source_name}' to '{target_name}' added!")
                         st.rerun()
                     else:
