@@ -1372,6 +1372,14 @@ def render_threat_model_dashboard():
     # Display Threats in Cards
     st.markdown("<div class='threat-grid'>", unsafe_allow_html=True)
     for i, threat in enumerate(filtered_threats_for_display):
+        # Pre-construct mitigations HTML to avoid nested f-string issues
+        mitigations_html = ""
+        if threat['mitigations']:
+            mitigations_list_items = [f"<li>{m['type']}: {m['control']}</li>" for m in threat['mitigations']]
+            mitigations_html = "".join(mitigations_list_items)
+        else:
+            mitigations_html = "<li>No mitigations defined yet.</li>"
+
         st.markdown(f"""
         <div class="threat-card {threat['risk_level'].lower()}">
             <div class="threat-header">
@@ -1394,7 +1402,7 @@ def render_threat_model_dashboard():
                 <div class="mitigation-list">
                     <h4>Mitigation Controls:</h4>
                     <ul>
-                        {''.join([f'<li>{m["type"]}: {m["control']}</li>' for m in threat['mitigations']]) if threat['mitigations'] else '<li>No mitigations defined yet.</li>'}
+                        {mitigations_html}
                     </ul>
                 </div>
             </div>
@@ -1408,7 +1416,7 @@ def render_threat_model_dashboard():
     st.subheader("Detailed Threat & Mitigation Editor")
     
     # Create a unique list of all threats for selection
-    all_threats_flat = [f"{t['name']} ({t['boundary']})" for t in all_threats_flat]
+    all_threat_names_for_editor = [f"{t['name']} ({t['boundary']})" for t in all_threats_flat]
     selected_threat_for_editor_display = st.selectbox(
         "Select a Threat to Edit Mitigations or Details",
         ["-- Select --"] + all_threat_names_for_editor,
