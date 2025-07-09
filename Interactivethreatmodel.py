@@ -124,7 +124,7 @@ st.markdown("""
     }
     .risk-score-display.critical { background: #e74c3c; }
     .risk-score-display.high { background: #f39c12; }
-    .risk-score-display.medium { background: #f1c40f; }
+    .risk-score-display.medium { background: #f1c40f; color: black; }
     .risk-score-display.low { background: #27ae60; }
     .threat-content {
         line-height: 1.6;
@@ -293,49 +293,154 @@ def calculate_risk(likelihood, impact):
 # Initial data structure for the threat model (default or loaded from session state)
 def get_initial_threat_data():
     return {
+        # --- Banking Application Threats ---
         'Internet -> DMZ': {
-            'description': 'External users accessing web-facing components',
+            'description': 'External users accessing web-facing components of the banking application',
             'components': ['Internet Users', 'Web Application Firewall', 'Load Balancer'],
             'threats': [
-                {'id': 'T1.001', 'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'risk_score': 20, 'risk_level': 'Critical',
+                {'id': 'T_Bank_1', 'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'risk_score': 20, 'risk_level': 'Critical',
                  'mitigations': [
-                     {'id': 'M1.001', 'type': 'Preventive', 'control': 'Extended Validation SSL certificates'},
-                     {'id': 'M1.002', 'type': 'Detective', 'control': 'Certificate transparency logs'}
+                     {'id': 'M_Bank_1_1', 'type': 'Preventive', 'control': 'Extended Validation SSL certificates'},
+                     {'id': 'M_Bank_1_2', 'type': 'Detective', 'control': 'Certificate transparency logs'}
                  ]},
-                {'id': 'T1.002', 'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': 3, 'impact': 4, 'risk_score': 12, 'risk_level': 'High',
+                {'id': 'T_Bank_2', 'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': 3, 'impact': 4, 'risk_score': 12, 'risk_level': 'High',
                  'mitigations': [
-                     {'id': 'M1.003', 'type': 'Preventive', 'control': 'DDoS Protection Service'},
-                     {'id': 'M1.004', 'type': 'Responsive', 'control': 'Traffic throttling'}
+                     {'id': 'M_Bank_2_1', 'type': 'Preventive', 'control': 'DDoS Protection Service'},
+                     {'id': 'M_Bank_2_2', 'type': 'Responsive', 'control': 'Traffic throttling'}
                  ]},
             ]
         },
         'DMZ -> Internal App Tier': {
-            'description': 'Web tier to Application tier - Authenticated requests only',
+            'description': 'Web tier to Application tier - Authenticated requests only for banking',
             'components': ['Web Servers (DMZ)', 'Application Servers', 'Authentication Services'],
             'threats': [
-                {'id': 'T2.001', 'name': 'SQL Injection', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'risk_score': 15, 'risk_level': 'High',
+                {'id': 'T_Bank_3', 'name': 'SQL Injection', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'risk_score': 15, 'risk_level': 'High',
                  'mitigations': [
-                     {'id': 'M2.001', 'type': 'Preventive', 'control': 'Parameterized queries'},
-                     {'id': 'M2.002', 'type': 'Preventive', 'control': 'Input validation'}
+                     {'id': 'M_Bank_3_1', 'type': 'Preventive', 'control': 'Parameterized queries'},
+                     {'id': 'M_Bank_3_2', 'type': 'Preventive', 'control': 'Input validation'}
                  ]},
-                {'id': 'T2.002', 'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'risk_score': 10, 'risk_level': 'High',
+                {'id': 'T_Bank_4', 'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'risk_score': 10, 'risk_level': 'High',
                  'mitigations': [
-                     {'id': 'M2.003', 'type': 'Preventive', 'control': 'Network segmentation'},
-                     {'id': 'M2.004', 'type': 'Detective', 'control': 'Network traffic analysis'}
+                     {'id': 'M_Bank_4_1', 'type': 'Preventive', 'control': 'Network segmentation'},
+                     {'id': 'M_Bank_4_2', 'type': 'Detective', 'control': 'Network traffic analysis'}
                  ]},
             ]
         },
         'Internal App Tier -> Database': {
-            'description': 'Application servers accessing database',
+            'description': 'Application servers accessing database for banking',
             'components': ['Application Servers', 'Database Server'],
             'threats': [
-                {'id': 'T3.001', 'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 5, 'risk_score': 10, 'risk_level': 'High',
+                {'id': 'T_Bank_5', 'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 5, 'risk_score': 10, 'risk_level': 'High',
                  'mitigations': [
-                     {'id': 'M3.001', 'type': 'Preventive', 'control': 'Data encryption at rest and in transit'},
-                     {'id': 'M3.002', 'type': 'Detective', 'control': 'Database activity monitoring'}
+                     {'id': 'M_Bank_5_1', 'type': 'Preventive', 'control': 'Data encryption at rest and in transit'},
+                     {'id': 'M_Bank_5_2', 'type': 'Detective', 'control': 'Database activity monitoring'}
                  ]},
             ]
         },
+        # --- Online Order Processing Threats ---
+        'Customer-Web App Boundary': {
+            'description': 'Customer interaction with the online order processing web application.',
+            'components': ['Customer', 'Web Application'],
+            'threats': [
+                {'id': 'T_Order_1', 'name': 'Phishing Attack (Order System)', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'risk_score': 20, 'risk_level': 'Critical',
+                 'mitigations': [
+                     {'id': 'M_Order_1_1', 'type': 'Preventive', 'control': 'Multi-factor authentication (MFA) for login.'},
+                     {'id': 'M_Order_1_2', 'type': 'Preventive', 'control': 'Strong email filtering and anti-phishing solutions.'}
+                 ]},
+                {'id': 'T_Order_2', 'name': 'DoS on Web Application (Order System)', 'category': 'Denial of Service', 'likelihood': 4, 'impact': 2, 'risk_score': 8, 'risk_level': 'Medium',
+                 'mitigations': [
+                     {'id': 'M_Order_2_1', 'type': 'Preventive', 'control': 'Implement rate limiting and anti-bot measures.'},
+                     {'id': 'M_Order_2_2', 'type': 'Preventive', 'control': 'Use a CDN/DDoS protection service.'}
+                 ]},
+                {'id': 'T_Order_3', 'name': 'Order Repudiation', 'category': 'Repudiation', 'likelihood': 2, 'impact': 3, 'risk_score': 6, 'risk_level': 'Low',
+                 'mitigations': [
+                     {'id': 'M_Order_3_1', 'type': 'Preventive', 'control': 'Comprehensive audit logging of all order actions.'},
+                     {'id': 'M_Order_3_2', 'type': 'Preventive', 'control': 'Email confirmations for order placement and shipment.'}
+                 ]},
+            ]
+        },
+        'Web App-Payment Gateway Boundary': {
+            'description': 'Communication between the web application and the external payment gateway.',
+            'components': ['Web Application', 'Payment Gateway'],
+            'threats': [
+                {'id': 'T_Order_4', 'name': 'Payment Gateway Bypass', 'category': 'Elevation of Privilege', 'likelihood': 3, 'impact': 3, 'risk_score': 9, 'risk_level': 'Medium',
+                 'mitigations': [
+                     {'id': 'M_Order_4_1', 'type': 'Preventive', 'control': 'Cryptographic signing/verification of payment callbacks.'},
+                     {'id': 'M_Order_4_2', 'type': 'Preventive', 'control': 'Server-side validation of all payment statuses.'}
+                 ]},
+            ]
+        },
+        'Web App-Database Boundary': {
+            'description': 'Communication between the web application and the order database.',
+            'components': ['Web Application', 'Order Database'],
+            'threats': [
+                {'id': 'T_Order_5', 'name': 'SQL Injection (Order DB)', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'risk_score': 15, 'risk_level': 'High',
+                 'mitigations': [
+                     {'id': 'M_Order_5_1', 'type': 'Preventive', 'control': 'Use parameterized queries/prepared statements.'},
+                     {'id': 'M_Order_5_2', 'type': 'Preventive', 'control': 'Implement strict input validation and sanitization.'}
+                 ]},
+                {'id': 'T_Order_6', 'name': 'Data Exfiltration (Order DB)', 'category': 'Information Disclosure', 'likelihood': 3, 'impact': 4, 'risk_score': 12, 'risk_level': 'High',
+                 'mitigations': [
+                     {'id': 'M_Order_6_1', 'type': 'Preventive', 'control': 'Data encryption at rest and in transit.'},
+                     {'id': 'M_Order_6_2', 'type': 'Detective', 'control': 'Audit logging and anomaly detection on database access.'}
+                 ]},
+            ]
+        },
+        'Web App-Shipping Service Boundary': {
+            'description': 'Communication between the web application and the shipping service.',
+            'components': ['Web Application', 'Shipping Service'],
+            'threats': [] # No specific threats for this boundary in the HTML sample, but it's defined.
+        }
+    }
+
+# Initial data structure for architecture (default or loaded from session state)
+def get_initial_architecture_data():
+    return {
+        'components': [
+            # --- Banking Application Components ---
+            {'id': 'customer_bank_id', 'name': 'Bank Customer', 'type': 'User', 'description': 'End-user of the banking application', 'x': 100, 'y': 100},
+            {'id': 'waf_id', 'name': 'WAF', 'type': 'Firewall', 'description': 'Web Application Firewall', 'x': 300, 'y': 50},
+            {'id': 'load_balancer_id', 'name': 'Load Balancer', 'type': 'Load Balancer', 'description': 'Distributes traffic', 'x': 300, 'y': 150},
+            {'id': 'web_server_id', 'name': 'Web Server (Bank)', 'type': 'Web Server', 'description': 'Serves banking web pages', 'x': 500, 'y': 100},
+            {'id': 'login_comp_id', 'name': 'Login Component', 'type': 'Application Server', 'description': 'Handles user authentication', 'x': 500, 'y': 200},
+            {'id': 'app_server_bank_id', 'name': 'App Server (Bank)', 'type': 'Application Server', 'description': 'Banking business logic', 'x': 700, 'y': 100},
+            {'id': 'auth_service_id', 'name': 'Auth Service', 'type': 'Authentication Service', 'description': 'External authentication provider', 'x': 700, 'y': 200},
+            {'id': 'db_server_bank_id', 'name': 'DB Server (Bank)', 'type': 'Database', 'description': 'Stores banking data', 'x': 900, 'y': 100},
+            {'id': 'core_banking_id', 'name': 'Core Banking System', 'type': 'Core Banking System', 'description': 'Main banking ledger', 'x': 900, 'y': 200},
+            {'id': 'payment_proc_id', 'name': 'Payment Processor', 'type': 'External Service', 'description': 'Third-party payment service', 'x': 1100, 'y': 50},
+            {'id': 'sms_email_id', 'name': 'SMS/Email Service', 'type': 'External Service', 'description': 'Notification service', 'x': 1100, 'y': 150},
+            {'id': 'credit_bureau_id', 'name': 'Credit Bureau', 'type': 'External Service', 'description': 'Credit check service', 'x': 1100, 'y': 250},
+
+            # --- Online Order Processing Components ---
+            {'id': 'customer_order_id', 'name': 'Order Customer', 'type': 'User', 'description': 'End-user of the order system', 'x': 100, 'y': 400},
+            {'id': 'web_app_order_id', 'name': 'Web Application (Order)', 'type': 'Web Server', 'description': 'Online storefront for orders', 'x': 300, 'y': 400},
+            {'id': 'payment_gateway_order_id', 'name': 'Payment Gateway (Order)', 'type': 'External Service', 'description': 'Handles order payments', 'x': 500, 'y': 400},
+            {'id': 'order_db_id', 'name': 'Order Database', 'type': 'Database', 'description': 'Stores order details', 'x': 300, 'y': 500},
+            {'id': 'shipping_service_id', 'name': 'Shipping Service', 'type': 'External Service', 'description': 'Manages product shipment', 'x': 500, 'y': 500},
+        ],
+        'connections': [
+            # --- Banking Application Connections ---
+            {'id': 'conn_bank_1', 'source_id': 'customer_bank_id', 'target_id': 'waf_id', 'data_flow': 'HTTP/S', 'description': 'Customer traffic to WAF', 'trust_boundary_crossing': 'Internet -> DMZ'},
+            {'id': 'conn_bank_2', 'source_id': 'customer_bank_id', 'target_id': 'load_balancer_id', 'data_flow': 'HTTP/S', 'description': 'Customer traffic to Load Balancer', 'trust_boundary_crossing': 'Internet -> DMZ'},
+            {'id': 'conn_bank_3', 'source_id': 'waf_id', 'target_id': 'web_server_id', 'data_flow': 'HTTP/S', 'description': 'WAF to Web Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+            {'id': 'conn_bank_4', 'source_id': 'load_balancer_id', 'target_id': 'web_server_id', 'data_flow': 'HTTP/S', 'description': 'Load Balancer to Web Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+            {'id': 'conn_bank_5', 'source_id': 'web_server_id', 'target_id': 'app_server_bank_id', 'data_flow': 'API Call', 'description': 'Web Server to App Server', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+            {'id': 'conn_bank_6', 'source_id': 'web_server_id', 'target_id': 'login_comp_id', 'data_flow': 'Internal API', 'description': 'Web Server to Login Component', 'trust_boundary_crossing': 'DMZ -> Internal App Tier'},
+            {'id': 'conn_bank_7', 'source_id': 'login_comp_id', 'target_id': 'auth_service_id', 'data_flow': 'Auth API', 'description': 'Login Component to Auth Service', 'trust_boundary_crossing': 'Internal App Tier -> External Auth'},
+            {'id': 'conn_bank_8', 'source_id': 'app_server_bank_id', 'target_id': 'db_server_bank_id', 'data_flow': 'DB Connection', 'description': 'App Server to DB Server', 'trust_boundary_crossing': 'Internal App Tier -> Database'},
+            {'id': 'conn_bank_9', 'source_id': 'app_server_bank_id', 'target_id': 'core_banking_id', 'data_flow': 'Core API', 'description': 'App Server to Core Banking', 'trust_boundary_crossing': 'Internal App Tier -> Core System'},
+            {'id': 'conn_bank_10', 'source_id': 'app_server_bank_id', 'target_id': 'payment_proc_id', 'data_flow': 'Payment API', 'description': 'App Server to Payment Processor', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
+            {'id': 'conn_bank_11', 'source_id': 'app_server_bank_id', 'target_id': 'sms_email_id', 'data_flow': 'Messaging API', 'description': 'App Server to SMS/Email Service', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
+            {'id': 'conn_bank_12', 'source_id': 'app_server_bank_id', 'target_id': 'credit_bureau_id', 'data_flow': 'Credit Check API', 'description': 'App Server to Credit Bureau', 'trust_boundary_crossing': 'Internal App Tier -> External Service'},
+
+            # --- Online Order Processing Connections ---
+            {'id': 'conn_order_1', 'source_id': 'customer_order_id', 'target_id': 'web_app_order_id', 'data_flow': 'Order Details', 'description': 'Customer submits order via web app', 'trust_boundary_crossing': 'Customer-Web App Boundary'},
+            {'id': 'conn_order_2', 'source_id': 'web_app_order_id', 'target_id': 'payment_gateway_order_id', 'data_flow': 'Payment Request', 'description': 'Web app sends payment request to gateway', 'trust_boundary_crossing': 'Web App-Payment Gateway Boundary'},
+            {'id': 'conn_order_3', 'source_id': 'payment_gateway_order_id', 'target_id': 'web_app_order_id', 'data_flow': 'Payment Confirmation', 'description': 'Payment gateway confirms payment to web app', 'trust_boundary_crossing': 'Web App-Payment Gateway Boundary'},
+            {'id': 'conn_order_4', 'source_id': 'web_app_order_id', 'target_id': 'order_db_id', 'data_flow': 'Store Order', 'description': 'Web app stores order in database', 'trust_boundary_crossing': 'Web App-Database Boundary'},
+            {'id': 'conn_order_5', 'source_id': 'web_app_order_id', 'target_id': 'shipping_service_id', 'data_flow': 'Shipment Request', 'description': 'Web app requests shipment from service', 'trust_boundary_crossing': 'Web App-Shipping Service Boundary'},
+            {'id': 'conn_order_6', 'source_id': 'order_db_id', 'target_id': 'web_app_order_id', 'data_flow': 'Order Status', 'description': 'Web app retrieves order status from database', 'trust_boundary_crossing': 'Web App-Database Boundary'},
+        ]
     }
 
 # Initialize session state for threat data
@@ -344,10 +449,7 @@ if 'threat_model' not in st.session_state:
 
 # Initialize session state for architecture data
 if 'architecture' not in st.session_state:
-    st.session_state.architecture = {
-        'components': [],
-        'connections': []
-    }
+    st.session_state.architecture = get_initial_architecture_data()
 
 def main():
     # Header
@@ -364,7 +466,7 @@ def main():
     # Reset button
     if st.sidebar.button("🔄 Reset All Data"):
         st.session_state.threat_model = get_initial_threat_data()
-        st.session_state.architecture = {'components': [], 'connections': []}
+        st.session_state.architecture = get_initial_architecture_data()
         st.rerun()
         st.success("Threat model and architecture data reset!")
 
@@ -914,61 +1016,47 @@ def main():
                 # Spoofing: Phishing attacks targeting users
                 if 'Phishing Attacks' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
-                # Denial of Service: DDoS attacks on web infrastructure
                 if 'DDoS Attacks' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
-                # Elevation of Privilege: SQL Injection (if web server interacts with DB)
                 if 'SQL Injection' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'SQL Injection', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
-                # Tampering: Cross-Site Scripting (XSS)
                 if 'Cross-Site Scripting (XSS)' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Cross-Site Scripting (XSS)', 'category': 'Tampering', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 2: Application to Database
             if source_comp['type'] == 'Application Server' and target_comp['type'] == 'Database':
-                # Tampering: Database Injection (similar to SQLi, but broader)
                 if 'Database Injection' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Database Injection', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
-                # Information Disclosure: Data Exfiltration
                 if 'Data Exfiltration' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
-                # Elevation of Privilege: Unauthorized Data Access
                 if 'Unauthorized Data Access' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Unauthorized Data Access', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 3: Connections crossing "Internal" boundaries (simplified)
             if "internal" in conn['trust_boundary_crossing'].lower():
-                # Elevation of Privilege: Lateral Movement
                 if 'Lateral Movement' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
-                # Spoofing: Internal Service Spoofing
                 if 'Internal Service Spoofing' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Internal Service Spoofing', 'category': 'Spoofing', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 4: External Integrations
             if target_comp['type'] == 'External Service' or source_comp['type'] == 'External Service':
-                # Information Disclosure: API Key Exposure
                 if 'API Key Exposure' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'API Key Exposure', 'category': 'Information Disclosure', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
-                # Information Disclosure: Data Sharing Violation
                 if 'Data Sharing Violation' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Data Sharing Violation', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 5: Authentication Services
             if target_comp['type'] == 'Authentication Service':
-                # Elevation of Privilege: Authentication Bypass
                 if 'Authentication Bypass' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Authentication Bypass', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
-                # Denial of Service / Elevation of Privilege: Credential Stuffing
                 if 'Credential Stuffing' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Credential Stuffing', 'category': 'Elevation of Privilege', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 6: Core Banking System
             if target_comp['type'] == 'Core Banking System':
-                # Tampering: Financial Fraud
                 if 'Financial Fraud' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Financial Fraud', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
-                # Tampering: Transaction Manipulation
                 if 'Transaction Manipulation' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Transaction Manipulation', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
 
