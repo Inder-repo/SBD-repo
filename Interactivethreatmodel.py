@@ -575,6 +575,7 @@ def main():
             let nodes = {json.dumps(st.session_state.architecture['components'])};
             let connections = {json.dumps(st.session_state.architecture['connections'])};
             let selectedNode = null;
+            // Pass the current threat model keys (trust boundaries) to JavaScript
             let threatBoundaryNames = {json.dumps(list(st.session_state.threat_model.keys()))};
 
             // Function to send data back to Streamlit
@@ -760,7 +761,7 @@ def main():
                 defaultOption.textContent = "-- Select or Type New --";
                 trustBoundarySelect.appendChild(defaultOption);
 
-                // Add existing boundaries
+                // Add existing boundaries from the Python session state
                 threatBoundaryNames.forEach(boundary => {{
                     const option = document.createElement('option');
                     option.value = boundary;
@@ -882,6 +883,20 @@ def main():
     
     st.markdown("---")
 
+    # --- STRIDE Methodology Overview ---
+    st.subheader("📖 STRIDE Methodology Overview")
+    st.markdown("""
+    The STRIDE threat model is a widely used framework for identifying and classifying security threats. Each letter in STRIDE represents a category of threat:
+
+    * **S - Spoofing:** Impersonating something or someone else. (e.g., an attacker pretending to be a legitimate user or server).
+    * **T - Tampering:** Modifying data or code. (e.g., an attacker altering data in transit or at rest).
+    * **R - Repudiation:** Denying an action without the ability to be disproven. (e.g., a user denying they performed a transaction).
+    * **I - Information Disclosure:** Exposing information to unauthorized individuals. (e.g., sensitive data leaks, improper error messages).
+    * **D - Denial of Service:** Preventing legitimate users from accessing a service. (e.g., a server being overwhelmed by requests).
+    * **E - Elevation of Privilege:** Gaining unauthorized higher-level access. (e.g., a regular user gaining administrative rights).
+    """)
+    st.markdown("---")
+
     # --- Automated Threat Suggestion ---
     st.subheader("💡 2. Automated Threat Suggestions")
     st.write("Based on your defined architecture, here are some suggested threats. Review and add them to your threat model.")
@@ -896,49 +911,64 @@ def main():
         if source_comp and target_comp:
             # Rule 1: Internet-facing components (User -> Web Server/Load Balancer)
             if source_comp['type'] == 'User' and (target_comp['type'] == 'Web Server' or target_comp['type'] == 'Load Balancer'):
+                # Spoofing: Phishing attacks targeting users
                 if 'Phishing Attacks' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Phishing Attacks', 'category': 'Spoofing', 'likelihood': 4, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                # Denial of Service: DDoS attacks on web infrastructure
                 if 'DDoS Attacks' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'DDoS Attacks', 'category': 'Denial of Service', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                # Elevation of Privilege: SQL Injection (if web server interacts with DB)
                 if 'SQL Injection' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'SQL Injection', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                # Tampering: Cross-Site Scripting (XSS)
                 if 'Cross-Site Scripting (XSS)' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Cross-Site Scripting (XSS)', 'category': 'Tampering', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 2: Application to Database
             if source_comp['type'] == 'Application Server' and target_comp['type'] == 'Database':
+                # Tampering: Database Injection (similar to SQLi, but broader)
                 if 'Database Injection' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Database Injection', 'category': 'Tampering', 'likelihood': 3, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                # Information Disclosure: Data Exfiltration
                 if 'Data Exfiltration' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Data Exfiltration', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                # Elevation of Privilege: Unauthorized Data Access
                 if 'Unauthorized Data Access' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Unauthorized Data Access', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 3: Connections crossing "Internal" boundaries (simplified)
             if "internal" in conn['trust_boundary_crossing'].lower():
+                # Elevation of Privilege: Lateral Movement
                 if 'Lateral Movement' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Lateral Movement', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                # Spoofing: Internal Service Spoofing
                 if 'Internal Service Spoofing' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Internal Service Spoofing', 'category': 'Spoofing', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 4: External Integrations
             if target_comp['type'] == 'External Service' or source_comp['type'] == 'External Service':
+                # Information Disclosure: API Key Exposure
                 if 'API Key Exposure' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'API Key Exposure', 'category': 'Information Disclosure', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
+                # Information Disclosure: Data Sharing Violation
                 if 'Data Sharing Violation' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Data Sharing Violation', 'category': 'Information Disclosure', 'likelihood': 2, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 5: Authentication Services
             if target_comp['type'] == 'Authentication Service':
+                # Elevation of Privilege: Authentication Bypass
                 if 'Authentication Bypass' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Authentication Bypass', 'category': 'Elevation of Privilege', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                # Denial of Service / Elevation of Privilege: Credential Stuffing
                 if 'Credential Stuffing' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Credential Stuffing', 'category': 'Elevation of Privilege', 'likelihood': 3, 'impact': 4, 'boundary': conn['trust_boundary_crossing']})
 
             # Rule 6: Core Banking System
             if target_comp['type'] == 'Core Banking System':
+                # Tampering: Financial Fraud
                 if 'Financial Fraud' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Financial Fraud', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
+                # Tampering: Transaction Manipulation
                 if 'Transaction Manipulation' not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
                     suggested_threats.append({'name': 'Transaction Manipulation', 'category': 'Tampering', 'likelihood': 2, 'impact': 5, 'boundary': conn['trust_boundary_crossing']})
 
