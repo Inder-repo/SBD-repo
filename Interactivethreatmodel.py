@@ -56,7 +56,8 @@ st.markdown("""
         padding: 0.8rem;
         border-radius: 8px;
         margin-bottom: 0.5rem;
-        border-left: 44px solid #51cf66;
+        /* Corrected from 44px to 4px */
+        border-left: 4px solid #51cf66; 
     }
     
     .risk-critical { background-color: #dc3545; color: white; padding: 0.3rem; border-radius: 5px; }
@@ -1594,7 +1595,7 @@ def render_trust_boundary_details():
                     
                     st.markdown("##### Mitigations:")
                     if threat['mitigations']:
-                        for mitigation in threat['mitigations']:
+                        for mitigation in mitigation in threat['mitigations']:
                             st.markdown(f"- **{mitigation['type']}**: {mitigation['control']}")
                     else:
                         st.info("No mitigations defined for this threat.")
