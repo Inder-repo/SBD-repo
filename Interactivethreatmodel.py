@@ -592,6 +592,8 @@ def render_threat_model_dashboard():
 
     # HTML/JS for the interactive diagram
     # This script handles adding nodes/edges and sending data back to Streamlit
+    # Pass sorted threat boundary names to JavaScript
+    sorted_threat_boundary_names = sorted(list(st.session_state.threat_model.keys()))
     diagram_html = f"""
     <!DOCTYPE html>
     <html>
@@ -848,7 +850,7 @@ def render_threat_model_dashboard():
             let connections = {json.dumps(st.session_state.architecture['connections'])};
             let selectedNode = null;
             // Pass the current threat model keys (trust boundaries) to JavaScript
-            let threatBoundaryNames = {json.dumps(list(st.session_state.threat_model.keys()))};
+            let threatBoundaryNames = {json.dumps(sorted_threat_boundary_names)};
 
             // Function to send data back to Streamlit
             function sendDataToStreamlit() {{
@@ -1471,6 +1473,11 @@ def render_threat_model_dashboard():
     st.subheader("Detailed Threat & Mitigation Editor")
     
     # Create a unique list of all threats for selection
+    all_threats_flat = []
+    for boundary, data in st.session_state.threat_model.items():
+        for threat in data['threats']:
+            all_threats_flat.append({**threat, 'boundary': boundary})
+
     all_threat_names_for_editor = [f"{t['name']} ({t['boundary']})" for t in all_threats_flat]
     selected_threat_for_editor_display = st.selectbox(
         "Select a Threat to Edit Mitigations or Details",
@@ -1595,7 +1602,7 @@ def render_trust_boundary_details():
                     
                     st.markdown("##### Mitigations:")
                     if threat['mitigations']:
-                        for mitigation in mitigation in threat['mitigations']:
+                        for mitigation in threat['mitigations']: # Corrected inner loop variable name
                             st.markdown(f"- **{mitigation['type']}**: {mitigation['control']}")
                     else:
                         st.info("No mitigations defined for this threat.")
