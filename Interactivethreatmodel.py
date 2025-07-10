@@ -354,10 +354,35 @@ def calculate_risk(likelihood, impact):
         risk_level = 'Low'
     return risk_score, risk_level
 
+# Define a list of common trust boundaries that should always be available
+COMMON_TRUST_BOUNDARIES = [
+    "Internet -> DMZ",
+    "DMZ -> Internal App Tier",
+    "Internal App Tier -> Database",
+    "Customer-Web App Boundary",
+    "Web App-Payment Gateway Boundary",
+    "Web App-Database Boundary",
+    "Web App-Shipping Service Boundary",
+    "User -> Application",
+    "Application -> API Gateway",
+    "API Gateway -> Microservice",
+    "Microservice -> Database",
+    "On-Premise -> Cloud",
+    "External Partner Network"
+]
+
 # Initial data structure for the threat model (default or loaded from session state)
 def get_initial_threat_data(sample_name="Banking Application"):
     if sample_name == "New Empty Model":
-        return {}
+        # For a new empty model, initialize with common boundaries but no threats
+        initial_threat_model = {}
+        for boundary in COMMON_TRUST_BOUNDARIES:
+            initial_threat_model[boundary] = {
+                'description': f"Common trust boundary: {boundary}",
+                'components': [],
+                'threats': []
+            }
+        return initial_threat_model
     
     banking_threat_data = {
         # --- Banking Application Threats ---
@@ -590,10 +615,10 @@ def render_threat_model_dashboard():
     st.subheader("🏗️ 1. Define System Architecture")
     st.write("Interact with the diagram below to add components and define data flows. Changes will automatically update your threat model.")
 
-    # HTML/JS for the interactive diagram
-    # This script handles adding nodes/edges and sending data back to Streamlit
-    # Pass sorted threat boundary names to JavaScript
-    sorted_threat_boundary_names = sorted(list(st.session_state.threat_model.keys()))
+    # Combine existing trust boundaries with common ones, ensuring uniqueness and sorting
+    all_current_boundaries = set(st.session_state.threat_model.keys())
+    all_boundaries_for_js = sorted(list(all_current_boundaries.union(COMMON_TRUST_BOUNDARIES)))
+
     diagram_html = f"""
     <!DOCTYPE html>
     <html>
@@ -849,8 +874,8 @@ def render_threat_model_dashboard():
             let nodes = {json.dumps(st.session_state.architecture['components'])};
             let connections = {json.dumps(st.session_state.architecture['connections'])};
             let selectedNode = null;
-            // Pass the current threat model keys (trust boundaries) to JavaScript
-            let threatBoundaryNames = {json.dumps(sorted_threat_boundary_names)};
+            // Pass the combined and sorted threat boundary names to JavaScript
+            let threatBoundaryNames = {json.dumps(all_boundaries_for_js)};
 
             // Function to send data back to Streamlit
             function sendDataToStreamlit() {{
@@ -1097,6 +1122,7 @@ def render_threat_model_dashboard():
                 trustBoundarySelect.appendChild(defaultOption);
 
                 // Add existing boundaries from the Python session state
+                // This 'threatBoundaryNames' now includes both sample-specific and common boundaries
                 threatBoundaryNames.forEach(boundary => {{
                     const option = document.createElement('option');
                     option.value = boundary;
@@ -1602,7 +1628,7 @@ def render_trust_boundary_details():
                     
                     st.markdown("##### Mitigations:")
                     if threat['mitigations']:
-                        for mitigation in threat['mitigations']: # Corrected inner loop variable name
+                        for mitigation in threat['mitigations']:
                             st.markdown(f"- **{mitigation['type']}**: {mitigation['control']}")
                     else:
                         st.info("No mitigations defined for this threat.")
