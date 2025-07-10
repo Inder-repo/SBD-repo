@@ -619,6 +619,11 @@ def render_threat_model_dashboard():
     all_current_boundaries = set(st.session_state.threat_model.keys())
     all_boundaries_for_js = sorted(list(all_current_boundaries.union(COMMON_TRUST_BOUNDARIES)))
 
+    # Debugging: Print current threat model keys to Streamlit UI
+    if st.session_state.current_sample == "New Empty Model":
+        st.info(f"Current Trust Boundaries in Python session state: {list(st.session_state.threat_model.keys())}")
+
+
     diagram_html = f"""
     <!DOCTYPE html>
     <html>
@@ -1149,6 +1154,9 @@ def render_threat_model_dashboard():
                         newBoundaryTextInput.style.display = 'none';
                     }}
                 }};
+
+                // Debugging: Log the array of boundaries being used to populate the dropdown
+                console.log("Trust Boundaries available in JS for dropdown:", threatBoundaryNames);
 
                 openModal('addConnectionModal');
             }});
