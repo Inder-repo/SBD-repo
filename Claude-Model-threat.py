@@ -562,10 +562,31 @@ def render_data_flow_form():
             st.success(f"✅ Data flow from '{source}' to '{target}' added successfully!")
             st.rerun()
 
+def delete_trust_boundary(boundary_id: str):
+    """Deletes a trust boundary from the session state."""
+    st.session_state.trust_boundaries = [b for b in st.session_state.trust_boundaries if b.id != boundary_id]
+    # Re-analyze data flows as boundary information might have changed
+    st.session_state.data_flows = analyze_trust_boundary_crossings(
+        st.session_state.components, st.session_state.data_flows, st.session_state.trust_boundaries
+    )
+    st.success("Trust boundary deleted successfully!")
+    # REMOVED st.rerun() from here (will be triggered by form submission or explicit rerun)
+
+
 def render_trust_boundary_form():
     """Render enhanced trust boundary creation form"""
     st.subheader("🔐 Manage Trust Boundaries")
     
+    # Define available options for controls and compliance here, outside any specific form/expander
+    available_controls = [
+        "Firewall", "IDS/IPS", "DLP", "WAF", "Load Balancer", "VPN", "MFA",
+        "Encryption", "Access Control", "Monitoring", "Audit Logging", "Network Segmentation",
+        "Input Validation", "Output Encoding", "Parameterized Queries", "Secure Session Management"
+    ]
+    compliance_options = [
+        "PCI DSS", "HIPAA", "SOC 2", "ISO 27001", "GDPR", "CCPA", "SOX", "FISMA", "NIST CSF"
+    ]
+
     # Quick setup with default boundaries
     if not st.session_state.trust_boundaries:
         st.info("💡 Start with default trust boundaries or create custom ones.")
@@ -601,18 +622,7 @@ def render_trust_boundary_form():
                 selected_components = []
                 st.info("Add components first to assign them to boundaries.")
             
-            # Security controls
-            available_controls = [
-                "Firewall", "IDS/IPS", "DLP", "WAF", "Load Balancer", "VPN", "MFA",
-                "Encryption", "Access Control", "Monitoring", "Audit Logging", "Network Segmentation",
-                "Input Validation", "Output Encoding", "Parameterized Queries", "Secure Session Management"
-            ]
             controls = st.multiselect("Security Controls", available_controls, key="tb_controls_multiselect")
-            
-            # Compliance requirements
-            compliance_options = [
-                "PCI DSS", "HIPAA", "SOC 2", "ISO 27001", "GDPR", "CCPA", "SOX", "FISMA", "NIST CSF"
-            ]
             compliance = st.multiselect("Compliance Requirements", compliance_options, key="tb_compliance_multiselect")
             
             submitted = st.form_submit_button("➕ Create Trust Boundary", type="primary")
@@ -649,6 +659,10 @@ def render_trust_boundary_form():
         st.info("No custom trust boundaries defined yet.")
     else:
         for i, boundary in enumerate(st.session_state.trust_boundaries):
+            # Initialize confirmation flag for each boundary
+            if f'confirm_delete_boundary_{boundary.id}' not in st.session_state:
+                st.session_state[f'confirm_delete_boundary_{boundary.id}'] = False
+
             with st.expander(f"⚙️ {boundary.name} (ID: {boundary.id})"):
                 with st.form(f"edit_boundary_form_{boundary.id}"):
                     edited_name = st.text_input("Boundary Name", boundary.name, key=f"name_{boundary.id}")
@@ -673,49 +687,61 @@ def render_trust_boundary_form():
                     filtered_compliance = [c for c in boundary.compliance_requirements if c in compliance_options]
                     edited_compliance = st.multiselect("Compliance Requirements", compliance_options, default=filtered_compliance, key=f"compliance_{boundary.id}")
 
-                    update_button = st.form_submit_button("💾 Update Boundary", type="secondary")
-                    delete_button = st.form_submit_button("🗑️ Delete Boundary", help="This will permanently delete the boundary.", on_click=lambda b_id=boundary.id: delete_trust_boundary(b_id), key=f"delete_{boundary.id}")
+                    # Use distinct submit buttons and check their return values
+                    update_button_clicked = st.form_submit_button("💾 Update Boundary", type="primary", key=f"update_boundary_submit_{boundary.id}")
+                    delete_button_clicked = st.form_submit_button("🗑️ Delete Boundary", help="This will permanently delete the boundary.", key=f"delete_boundary_submit_{boundary.id}")
 
-                    if update_button:
+                    if update_button_clicked:
                         # Check for duplicate name if name changed
                         if edited_name != boundary.name and any(b.name == edited_name for b in st.session_state.trust_boundaries if b.id != boundary.id):
                             st.error(f"❌ Trust Boundary with name '{edited_name}' already exists. Please choose a unique name.")
-                            st.rerun() # Rerun to show error and keep form state
-                            return
+                            # No rerun here, form submission will handle it
+                        else:
+                            # Update references in components and data flows if name changed
+                            if edited_name != boundary.name:
+                                for comp in st.session_state.components:
+                                    if comp.name in boundary.components:
+                                        pass
+                                for flow in st.session_state.data_flows:
+                                    if flow.trust_boundary_crossed and boundary.name in flow.trust_boundary_crossed:
+                                        flow.trust_boundary_crossed = flow.trust_boundary_crossed.replace(boundary.name, edited_name)
 
-                        # Update references in components and data flows if name changed
-                        if edited_name != boundary.name:
-                            for comp in st.session_state.components:
-                                if comp.name in boundary.components: # If component was in old boundary, it's now in new name
-                                    pass # Component name doesn't change, only the boundary's name
-                            for flow in st.session_state.data_flows:
-                                if flow.trust_boundary_crossed and boundary.name in flow.trust_boundary_crossed:
-                                    flow.trust_boundary_crossed = flow.trust_boundary_crossed.replace(boundary.name, edited_name)
+                            boundary.name = edited_name
+                            boundary.boundary_type = edited_type
+                            boundary.security_level = SecurityLevel(edited_security_level)
+                            boundary.color = edited_color
+                            boundary.description = edited_description
+                            boundary.components = selected_comps_for_boundary
+                            boundary.controls = edited_controls
+                            boundary.compliance_requirements = edited_compliance
+                            boundary.updated_at = datetime.now()
+                            st.session_state.data_flows = analyze_trust_boundary_crossings(
+                                st.session_state.components, st.session_state.data_flows, st.session_state.trust_boundaries
+                            )
+                            st.success(f"✅ Trust boundary '{boundary.name}' updated successfully!")
+                            # No explicit rerun here, form submission will handle it
 
-                        boundary.name = edited_name
-                        boundary.boundary_type = edited_type
-                        boundary.security_level = SecurityLevel(edited_security_level)
-                        boundary.color = edited_color
-                        boundary.description = edited_description
-                        boundary.components = selected_comps_for_boundary
-                        boundary.controls = edited_controls
-                        boundary.compliance_requirements = edited_compliance
-                        boundary.updated_at = datetime.now()
-                        st.session_state.data_flows = analyze_trust_boundary_crossings(
-                            st.session_state.components, st.session_state.data_flows, st.session_state.trust_boundaries
-                        ) # Re-analyze after updates
-                        st.success(f"✅ Trust boundary '{boundary.name}' updated successfully!")
-                        st.rerun()
+                    elif delete_button_clicked:
+                        # Set a flag to show the confirmation popover in the next rerun
+                        st.session_state[f'confirm_delete_boundary_{boundary.id}'] = True
+                        # No explicit rerun here; the form submission already caused one.
+                        # The confirmation popover will be rendered in the next run.
 
-def delete_trust_boundary(boundary_id: str):
-    """Deletes a trust boundary from the session state."""
-    st.session_state.trust_boundaries = [b for b in st.session_state.trust_boundaries if b.id != boundary_id]
-    # Re-analyze data flows as boundary information might have changed
-    st.session_state.data_flows = analyze_trust_boundary_crossings(
-        st.session_state.components, st.session_state.data_flows, st.session_state.trust_boundaries
-    )
-    st.success("Trust boundary deleted successfully!")
-    st.rerun()
+            # Outside the form, check for the confirmation flag and render popover
+            if st.session_state.get(f'confirm_delete_boundary_{boundary.id}', False):
+                with st.popover(f"Confirm Delete Boundary: {boundary.name}"):
+                    st.warning(f"Are you sure you want to delete '{boundary.name}'? This action is irreversible.")
+                    col_confirm_del1, col_confirm_del2 = st.columns(2)
+                    with col_confirm_del1:
+                        if st.button("Yes, Delete", key=f"final_confirm_delete_{boundary.id}"):
+                            delete_trust_boundary(boundary.id)
+                            st.session_state[f'confirm_delete_boundary_{boundary.id}'] = False # Reset flag
+                            st.experimental_rerun() # Explicit rerun after confirmed delete
+                    with col_confirm_del2:
+                        if st.button("Cancel", key=f"cancel_delete_{boundary.id}"):
+                            st.session_state[f'confirm_delete_boundary_{boundary.id}'] = False # Reset flag
+                            st.experimental_rerun() # Explicit rerun to close popover
+
 
 def render_component_table():
     """Render enhanced component table with management actions"""
@@ -1043,10 +1069,14 @@ def create_enhanced_architecture_diagram(components, data_flows, trust_boundarie
 
     # Add data flows as arrows
     if show_flows and data_flows:
-        for flow in data_flows:
-            source_comp = next((c for c in components if c.name == flow.source), None)
-            target_comp = next((c for c in components if c.name == flow.target), None)
+        # Create a dictionary for quick component lookup by name
+        component_map = {c.name: c for c in components}
 
+        for flow in data_flows:
+            source_comp = component_map.get(flow.source)
+            target_comp = component_map.get(flow.target)
+
+            # ONLY add annotation if both source and target components exist
             if source_comp and target_comp:
                 line_color = 'grey'
                 line_width = 1
