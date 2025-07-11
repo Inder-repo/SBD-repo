@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -320,6 +319,9 @@ def initialize_session_state():
     if 'organization' not in st.session_state:
         st.session_state.organization = "Enterprise Corp"
 
+    if 'user_name' not in st.session_state:
+        st.session_state.user_name = "John Doe" # Added for display in header
+
 def generate_id(prefix: str = "") -> str:
     """Generate a unique ID with optional prefix"""
     return f"{prefix}{str(uuid.uuid4())[:8]}"
@@ -354,8 +356,8 @@ def create_default_trust_boundaries() -> List[TrustBoundary]:
     
     return boundaries
 
-def analyze_trust_boundary_crossings(data_flows: List[DataFlow], 
-                                   trust_boundaries: List[TrustBoundary]) -> List[DataFlow]:
+def analyze_trust_boundary_crossings(data_flows: List[DataFlow],
+                                    trust_boundaries: List[TrustBoundary]) -> List[DataFlow]:
     """Analyze which data flows cross trust boundaries"""
     updated_flows = []
     
@@ -364,33 +366,29 @@ def analyze_trust_boundary_crossings(data_flows: List[DataFlow],
         source_boundary = None
         target_boundary = None
         
-        for boundary in trust_boundaries:
-            if flow.source in boundary.components:
-                source_boundary = boundary
-            if flow.target in boundary.components:
-                target_boundary = boundary
+        # Helper to find which boundary a component belongs to
+        def get_component_boundary(component_name: str) -> Optional[TrustBoundary]:
+            for boundary in trust_boundaries:
+                if component_name in boundary.components:
+                    return boundary
+            return None
+
+        source_boundary = get_component_boundary(flow.source)
+        target_boundary = get_component_boundary(flow.target)
         
         # Update flow with boundary crossing information
         if source_boundary and target_boundary and source_boundary.id != target_boundary.id:
             flow.crosses_trust_boundary = True
             flow.trust_boundary_crossed = f"{source_boundary.name} → {target_boundary.name}"
-        
+        else:
+            flow.crosses_trust_boundary = False
+            flow.trust_boundary_crossed = None # Reset if it no longer crosses
+            
         updated_flows.append(flow)
     
     return updated_flows
 
-# This completes Part 1 - Enhanced Data Flow Architecture with Trust Boundary Support
-# The next parts will build upon this foundation with UI components, commercial features, etc.
-
-
 # Part 2: Enterprise-Grade UI Components and Layout
-# This builds upon Part 1's enhanced data structures
-
-import streamlit as st
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime, timedelta
-import pandas as pd
 
 # Enterprise UI Configuration
 ENTERPRISE_THEME = {
@@ -409,7 +407,7 @@ ENTERPRISE_THEME = {
 def render_header():
     """Render professional header with branding"""
     st.markdown("""
-    <div style="background: linear-gradient(90deg, #1f77b4 0%, #2ca02c 100%); 
+    <div style="background: linear-gradient(90deg, #1f77b4 0%, #2ca02c 100%);
                 padding: 2rem; margin: -1rem -1rem 2rem -1rem; border-radius: 10px;">
         <div style="display: flex; align-items: center; justify-content: space-between;">
             <div>
@@ -442,14 +440,14 @@ def render_metrics_dashboard():
     
     with col1:
         st.metric(
-            label="🏗️ Components", 
+            label="🏗️ **Components**",
             value=len(st.session_state.get('components', [])),
             delta=f"+{len([c for c in st.session_state.get('components', []) if c.created_at.date() == datetime.now().date()])}"
         )
     
     with col2:
         st.metric(
-            label="🔄 Data Flows", 
+            label="🔄 **Data Flows**",
             value=len(st.session_state.get('data_flows', [])),
             delta=f"+{len([f for f in st.session_state.get('data_flows', []) if f.created_at.date() == datetime.now().date()])}"
         )
@@ -458,7 +456,7 @@ def render_metrics_dashboard():
         threats = st.session_state.get('threats', [])
         high_critical = len([t for t in threats if t.severity in [ThreatSeverity.HIGH, ThreatSeverity.CRITICAL]])
         st.metric(
-            label="⚠️ Critical/High Threats", 
+            label="⚠️ **Critical/High Threats**",
             value=high_critical,
             delta=f"{high_critical}/{len(threats)}" if threats else "0/0"
         )
@@ -466,7 +464,7 @@ def render_metrics_dashboard():
     with col4:
         boundaries = st.session_state.get('trust_boundaries', [])
         st.metric(
-            label="🔐 Trust Boundaries", 
+            label="🔐 **Trust Boundaries**",
             value=len(boundaries),
             delta=f"Security Zones"
         )
@@ -518,8 +516,8 @@ def render_component_form():
         with col2:
             comp_owner = st.text_input("Owner", placeholder="Team or individual responsible")
             comp_security_level = st.selectbox("Security Level", [s.value for s in SecurityLevel])
-            comp_data_classification = st.selectbox("Data Classification", 
-                                                   ["Public", "Internal", "Confidential", "Restricted"])
+            comp_data_classification = st.selectbox("Data Classification",
+                                                    ["Public", "Internal", "Confidential", "Restricted"])
             
         # Position controls
         st.subheader("Position")
@@ -532,7 +530,7 @@ def render_component_form():
         # Technologies
         comp_technologies = st.multiselect(
             "Technologies/Frameworks",
-            ["Java", "Python", "Node.js", "React", "Angular", "PostgreSQL", "MongoDB", 
+            ["Java", "Python", "Node.js", "React", "Angular", "PostgreSQL", "MongoDB",
              "Redis", "Docker", "Kubernetes", "AWS", "Azure", "GCP", "Nginx", "Apache"],
             help="Select applicable technologies"
         )
@@ -578,8 +576,8 @@ def render_data_flow_form():
         with col2:
             protocol = st.selectbox("Protocol*", ["HTTPS", "HTTP", "TLS", "TCP", "UDP", "WebSocket", "gRPC"])
             port = st.number_input("Port", min_value=1, max_value=65535, value=443)
-            data_classification = st.selectbox("Data Classification", 
-                                             ["Public", "Internal", "Confidential", "Restricted"])
+            data_classification = st.selectbox("Data Classification",
+                                              ["Public", "Internal", "Confidential", "Restricted"])
         
         # Security controls
         st.subheader("Security Controls")
@@ -589,8 +587,8 @@ def render_data_flow_form():
         with sec_col2:
             authentication = st.checkbox("Authentication Required", value=True)
             
-        flow_description = st.text_area("Description", 
-                                      placeholder="Describe the data flow and its business purpose")
+        flow_description = st.text_area("Description",
+                                         placeholder="Describe the data flow and its business purpose")
         
         submitted = st.form_submit_button("➕ Add Data Flow", type="primary")
         
@@ -613,6 +611,10 @@ def render_data_flow_form():
             )
             
             st.session_state.data_flows.append(new_flow)
+            # Re-analyze boundary crossings after adding a new flow
+            st.session_state.data_flows = analyze_trust_boundary_crossings(
+                st.session_state.data_flows, st.session_state.trust_boundaries
+            )
             st.success(f"✅ Data flow from '{source}' to '{target}' added successfully!")
             st.rerun()
 
@@ -625,6 +627,10 @@ def render_trust_boundary_form():
         st.info("💡 Start with default trust boundaries or create custom ones.")
         if st.button("🚀 Setup Default Trust Boundaries", type="primary"):
             st.session_state.trust_boundaries = create_default_trust_boundaries()
+            # Update data flows after boundaries are created/updated
+            st.session_state.data_flows = analyze_trust_boundary_crossings(
+                st.session_state.data_flows, st.session_state.trust_boundaries
+            )
             st.success("✅ Default trust boundaries created!")
             st.rerun()
     
@@ -640,8 +646,8 @@ def render_trust_boundary_form():
                 
             with col2:
                 color = st.color_picker("Boundary Color", "#4CAF50")
-                boundary_description = st.text_area("Description", 
-                                                  placeholder="Describe the trust boundary and its purpose")
+                boundary_description = st.text_area("Description",
+                                                     placeholder="Describe the trust boundary and its purpose")
             
             # Component selection
             if st.session_state.components:
@@ -653,7 +659,7 @@ def render_trust_boundary_form():
             
             # Security controls
             available_controls = [
-                "Firewall", "IDS/IPS", "DLP", "WAF", "Load Balancer", "VPN", "MFA", 
+                "Firewall", "IDS/IPS", "DLP", "WAF", "Load Balancer", "VPN", "MFA",
                 "Encryption", "Access Control", "Monitoring", "Audit Logging"
             ]
             controls = st.multiselect("Security Controls", available_controls)
@@ -680,8 +686,67 @@ def render_trust_boundary_form():
                 )
                 
                 st.session_state.trust_boundaries.append(new_boundary)
+                # Update data flows after boundaries are created/updated
+                st.session_state.data_flows = analyze_trust_boundary_crossings(
+                    st.session_state.data_flows, st.session_state.trust_boundaries
+                )
                 st.success(f"✅ Trust boundary '{boundary_name}' created successfully!")
                 st.rerun()
+
+    # Display and edit existing trust boundaries
+    st.subheader("Existing Trust Boundaries")
+    if not st.session_state.trust_boundaries:
+        st.info("No custom trust boundaries defined yet.")
+    else:
+        for i, boundary in enumerate(st.session_state.trust_boundaries):
+            with st.expander(f"⚙️ {boundary.name} (ID: {boundary.id})"):
+                with st.form(f"edit_boundary_form_{boundary.id}"):
+                    edited_name = st.text_input("Boundary Name", boundary.name, key=f"name_{boundary.id}")
+                    edited_type = st.selectbox("Boundary Type", ["Network", "Process", "Physical", "Administrative"], index=["Network", "Process", "Physical", "Administrative"].index(boundary.boundary_type), key=f"type_{boundary.id}")
+                    edited_security_level = st.selectbox("Security Level", [s.value for s in SecurityLevel], index=[s.value for s in SecurityLevel].index(boundary.security_level.value), key=f"sec_level_{boundary.id}")
+                    edited_color = st.color_picker("Boundary Color", boundary.color, key=f"color_{boundary.id}")
+                    edited_description = st.text_area("Description", boundary.description, key=f"desc_{boundary.id}")
+
+                    # Components can be updated here
+                    current_component_names = [c.name for c in st.session_state.components]
+                    selected_comps_for_boundary = st.multiselect(
+                        "Components in Boundary",
+                        current_component_names,
+                        default=[c for c in boundary.components if c in current_component_names], # Only show existing components
+                        key=f"comps_{boundary.id}"
+                    )
+
+                    edited_controls = st.multiselect("Security Controls", available_controls, default=boundary.controls, key=f"controls_{boundary.id}")
+                    edited_compliance = st.multiselect("Compliance Requirements", compliance_options, default=boundary.compliance_requirements, key=f"compliance_{boundary.id}")
+
+                    update_button = st.form_submit_button("💾 Update Boundary", type="secondary")
+                    delete_button = st.form_submit_button("🗑️ Delete Boundary", help="This will permanently delete the boundary.", on_click=lambda b_id=boundary.id: delete_trust_boundary(b_id), key=f"delete_{boundary.id}")
+
+                    if update_button:
+                        boundary.name = edited_name
+                        boundary.boundary_type = edited_type
+                        boundary.security_level = SecurityLevel(edited_security_level)
+                        boundary.color = edited_color
+                        boundary.description = edited_description
+                        boundary.components = selected_comps_for_boundary
+                        boundary.controls = edited_controls
+                        boundary.compliance_requirements = edited_compliance
+                        boundary.updated_at = datetime.now()
+                        st.session_state.data_flows = analyze_trust_boundary_crossings(
+                            st.session_state.data_flows, st.session_state.trust_boundaries
+                        ) # Re-analyze after updates
+                        st.success(f"✅ Trust boundary '{boundary.name}' updated successfully!")
+                        st.rerun()
+
+def delete_trust_boundary(boundary_id: str):
+    """Deletes a trust boundary from the session state."""
+    st.session_state.trust_boundaries = [b for b in st.session_state.trust_boundaries if b.id != boundary_id]
+    # Re-analyze data flows as boundary information might have changed
+    st.session_state.data_flows = analyze_trust_boundary_crossings(
+        st.session_state.data_flows, st.session_state.trust_boundaries
+    )
+    st.success("Trust boundary deleted successfully!")
+    st.rerun()
 
 def render_component_table():
     """Render enhanced component table with management actions"""
@@ -695,13 +760,15 @@ def render_component_table():
     component_data = []
     for comp in st.session_state.components:
         component_data.append({
+            "ID": comp.id, # Added ID for potential reference
             "Name": comp.name,
             "Type": comp.type.value,
             "Security Level": comp.security_level.value,
             "Data Classification": comp.data_classification,
             "Owner": comp.owner,
             "Technologies": ", ".join(comp.technologies) if comp.technologies else "None",
-            "Created": comp.created_at.strftime("%Y-%m-%d")
+            "Created": comp.created_at.strftime("%Y-%m-%d"),
+            "Last Updated": comp.updated_at.strftime("%Y-%m-%d %H:%M")
         })
     
     df = pd.DataFrame(component_data)
@@ -710,14 +777,14 @@ def render_component_table():
     filter_col1, filter_col2, filter_col3 = st.columns(3)
     
     with filter_col1:
-        type_filter = st.selectbox("Filter by Type", ["All"] + [t.value for t in ComponentType if t != ComponentType.TRUST_BOUNDARY])
+        type_filter = st.selectbox("Filter by Type", ["All"] + [t.value for t in ComponentType if t != ComponentType.TRUST_BOUNDARY], key="comp_type_filter")
     
     with filter_col2:
-        security_filter = st.selectbox("Filter by Security Level", ["All"] + [s.value for s in SecurityLevel])
+        security_filter = st.selectbox("Filter by Security Level", ["All"] + [s.value for s in SecurityLevel], key="comp_sec_filter")
     
     with filter_col3:
-        classification_filter = st.selectbox("Filter by Data Classification", 
-                                           ["All", "Public", "Internal", "Confidential", "Restricted"])
+        classification_filter = st.selectbox("Filter by Data Classification",
+                                            ["All", "Public", "Internal", "Confidential", "Restricted"], key="comp_data_filter")
     
     # Apply filters
     filtered_df = df.copy()
@@ -732,12 +799,126 @@ def render_component_table():
     st.dataframe(filtered_df, use_container_width=True, hide_index=True)
     
     # Component management actions
-    if st.button("🗑️ Clear All Components", type="secondary"):
-        if st.session_state.components:
-            st.session_state.components = []
-            st.session_state.data_flows = []  # Clear dependent data flows
-            st.success("✅ All components cleared!")
+    st.markdown("---")
+    st.subheader("Component Management Actions")
+    col_del, col_edit = st.columns(2)
+
+    with col_del:
+        comp_to_delete = st.selectbox(
+            "Select Component to Delete",
+            [""] + [c.name for c in st.session_state.components],
+            key="delete_comp_select"
+        )
+        if st.button("🗑️ Delete Selected Component", type="secondary", disabled=comp_to_delete == ""):
+            if comp_to_delete:
+                delete_component(comp_to_delete)
+    
+    with col_edit:
+        comp_to_edit_name = st.selectbox(
+            "Select Component to Edit",
+            [""] + [c.name for c in st.session_state.components],
+            key="edit_comp_select"
+        )
+        if comp_to_edit_name:
+            selected_comp = next((c for c in st.session_state.components if c.name == comp_to_edit_name), None)
+            if selected_comp:
+                with st.expander(f"Edit {selected_comp.name}"):
+                    edit_component_form(selected_comp)
+
+    st.markdown("---")
+    if st.button("🚨 Clear All Components and Data Flows", type="secondary"):
+        if st.session_state.components or st.session_state.data_flows:
+            if st.popover("Confirm Clear All"):
+                if st.button("Yes, Clear All (Irreversible)", type="primary"):
+                    st.session_state.components = []
+                    st.session_state.data_flows = []  # Clear dependent data flows
+                    st.session_state.trust_boundaries = create_default_trust_boundaries() # Reset boundaries too
+                    st.session_state.threats = [] # Clear threats
+                    st.success("✅ All components, data flows, and threats cleared!")
+                    st.rerun()
+
+def delete_component(component_name: str):
+    """Deletes a component and any associated data flows."""
+    # Find the component ID
+    comp_id = next((c.id for c in st.session_state.components if c.name == component_name), None)
+
+    if comp_id:
+        st.session_state.components = [c for c in st.session_state.components if c.name != component_name]
+        # Remove data flows where this component is source or target
+        st.session_state.data_flows = [
+            f for f in st.session_state.data_flows
+            if f.source != component_name and f.target != component_name
+        ]
+        # Remove component from any trust boundaries it was part of
+        for boundary in st.session_state.trust_boundaries:
+            if component_name in boundary.components:
+                boundary.components.remove(component_name)
+        # Re-analyze data flows as boundary associations might have changed
+        st.session_state.data_flows = analyze_trust_boundary_crossings(
+            st.session_state.data_flows, st.session_state.trust_boundaries
+        )
+        st.success(f"✅ Component '{component_name}' and its associated data flows deleted.")
+        st.rerun()
+
+def edit_component_form(component: Component):
+    """Renders a form to edit an existing component."""
+    with st.form(f"edit_comp_form_{component.id}"):
+        edited_name = st.text_input("Component Name*", component.name, key=f"edit_name_{component.id}")
+        edited_type = st.selectbox("Component Type*", [t.value for t in ComponentType if t != ComponentType.TRUST_BOUNDARY], index=[t.value for t in ComponentType if t != ComponentType.TRUST_BOUNDARY].index(component.type.value), key=f"edit_type_{component.id}")
+        edited_description = st.text_area("Description", component.description, key=f"edit_desc_{component.id}")
+        edited_owner = st.text_input("Owner", component.owner, key=f"edit_owner_{component.id}")
+        edited_security_level = st.selectbox("Security Level", [s.value for s in SecurityLevel], index=[s.value for s in SecurityLevel].index(component.security_level.value), key=f"edit_sec_level_{component.id}")
+        edited_data_classification = st.selectbox("Data Classification", ["Public", "Internal", "Confidential", "Restricted"], index=["Public", "Internal", "Confidential", "Restricted"].index(component.data_classification), key=f"edit_data_class_{component.id}")
+
+        st.markdown("---")
+        st.write("Position (adjust if needed)")
+        edited_x = st.slider("X Position", 1, 10, int(component.x), key=f"edit_x_{component.id}")
+        edited_y = st.slider("Y Position", 1, 10, int(component.y), key=f"edit_y_{component.id}")
+
+        edited_technologies = st.multiselect(
+            "Technologies/Frameworks",
+            ["Java", "Python", "Node.js", "React", "Angular", "PostgreSQL", "MongoDB",
+             "Redis", "Docker", "Kubernetes", "AWS", "Azure", "GCP", "Nginx", "Apache"],
+            default=component.technologies,
+            key=f"edit_tech_{component.id}"
+        )
+
+        update_submitted = st.form_submit_button("💾 Update Component", type="primary")
+
+        if update_submitted:
+            # Update component in session state
+            component.name = edited_name
+            component.type = ComponentType(edited_type)
+            component.description = edited_description
+            component.owner = edited_owner
+            component.security_level = SecurityLevel(edited_security_level)
+            component.data_classification = edited_data_classification
+            component.x = edited_x
+            component.y = edited_y
+            component.technologies = edited_technologies
+            component.updated_at = datetime.now()
+
+            # If component name changed, update references in data flows and trust boundaries
+            # This is critical for data integrity!
+            original_name = next((c.name for c in st.session_state.components if c.id == component.id), None)
+            if original_name and original_name != edited_name:
+                for flow in st.session_state.data_flows:
+                    if flow.source == original_name:
+                        flow.source = edited_name
+                    if flow.target == original_name:
+                        flow.target = edited_name
+                for boundary in st.session_state.trust_boundaries:
+                    if original_name in boundary.components:
+                        idx = boundary.components.index(original_name)
+                        boundary.components[idx] = edited_name
+
+            # Re-analyze data flows as component name or boundary associations might have changed
+            st.session_state.data_flows = analyze_trust_boundary_crossings(
+                st.session_state.data_flows, st.session_state.trust_boundaries
+            )
+            st.success(f"✅ Component '{edited_name}' updated successfully!")
             st.rerun()
+
 
 def render_enhanced_architecture_diagram():
     """Render enhanced architecture diagram with professional styling"""
@@ -777,16 +958,16 @@ def render_enhanced_architecture_diagram():
         if st.button("📄 Export as PDF"):
             st.info("Feature available in full version - Export diagram as PDF")
 
-def create_enhanced_architecture_diagram(components, data_flows, trust_boundaries, 
-                                       show_labels=True, show_boundaries=True, show_flows=True):
+def create_enhanced_architecture_diagram(components, data_flows, trust_boundaries,
+                                         show_labels=True, show_boundaries=True, show_flows=True):
     """Create an enhanced professional architecture diagram"""
     fig = go.Figure()
     
-    # Enhanced color scheme
-    component_colors = {
-        ComponentType.EXTERNAL_ENTITY: '#FF6B6B',
-        ComponentType.PROCESS: '#4ECDC4',
-        ComponentType.DATA_STORE: '#45B7D1'
+    # Enhanced color scheme for component types
+    component_type_colors = {
+        ComponentType.EXTERNAL_ENTITY: '#FF6B6B', # Reddish
+        ComponentType.PROCESS: '#4ECDC4',        # Teal
+        ComponentType.DATA_STORE: '#45B7D1'      # Sky Blue
     }
     
     # Add trust boundaries as enhanced shapes
@@ -794,10 +975,11 @@ def create_enhanced_architecture_diagram(components, data_flows, trust_boundarie
         for i, boundary in enumerate(trust_boundaries):
             boundary_components = [c for c in components if c.name in boundary.components]
             if boundary_components:
-                min_x = min(c.x for c in boundary_components) - 0.4
-                max_x = max(c.x for c in boundary_components) + 0.4
-                min_y = min(c.y for c in boundary_components) - 0.4
-                max_y = max(c.y for c in boundary_components) + 0.4
+                # Calculate bounding box for components within this boundary
+                min_x = min(c.x for c in boundary_components) - 0.7
+                max_x = max(c.x for c in boundary_components) + 0.7
+                min_y = min(c.y for c in boundary_components) - 0.7
+                max_y = max(c.y for c in boundary_components) + 0.7
                 
                 # Add boundary rectangle with enhanced styling
                 fig.add_shape(
@@ -805,1023 +987,783 @@ def create_enhanced_architecture_diagram(components, data_flows, trust_boundarie
                     x0=min_x, y0=min_y,
                     x1=max_x, y1=max_y,
                     fillcolor=boundary.color,
-                    opacity=0.2,
-                    line=dict(width=3, color=boundary.color, dash="dash"),
-                    layer="below"
+                    opacity=0.15, # Slightly less opaque
+                    line=dict(width=3, color=boundary.color, dash="dashdot"), # More distinct dash pattern
+                    layer="below",
+                    name=boundary.name, # Name for hover info
+                    xref="x", yref="y"
                 )
                 
-                # Add enhanced boundary label
+                # Add enhanced boundary label - positioned dynamically
                 fig.add_annotation(
-                    x=min_x + 0.1,
-                    y=max_y - 0.1,
-                    text=f"🔐 {boundary.name}",
+                    x=min_x + (max_x - min_x) / 2, # Center horizontally
+                    y=max_y + 0.3, # Slightly above the top edge
+                    text=f"<b>{boundary.name}</b><br>({boundary.security_level.value} Trust)",
                     showarrow=False,
-                    font=dict(size=12, color="white", family="Arial Black"),
-                    bgcolor=boundary.color,
-                    bordercolor="white",
-                    borderwidth=2,
+                    font=dict(
+                        family="Arial, sans-serif",
+                        size=12,
+                        color=boundary.color
+                    ),
+                    align="center",
+                    bordercolor=boundary.color,
+                    borderwidth=1,
                     borderpad=4,
+                    bgcolor="rgba(255,255,255,0.8)",
                     opacity=0.9
                 )
-                
-                # Add security level indicator
-                fig.add_annotation(
-                    x=max_x - 0.1,
-                    y=max_y - 0.1,
-                    text=f"🛡️ {boundary.security_level.value}",
-                    showarrow=False,
-                    font=dict(size=10, color="white"),
-                    bgcolor=boundary.color,
-                    bordercolor="white",
-                    borderwidth=1,
-                    borderpad=2,
-                    opacity=0.8
-                )
-    
-    # Add components with enhanced styling
-    for component in components:
-        color = component_colors.get(component.type, '#95A5A6')
-        
-        # Determine symbol based on type
-        symbol = 'circle'
-        if component.type == ComponentType.DATA_STORE:
-            symbol = 'square'
-        elif component.type == ComponentType.EXTERNAL_ENTITY:
-            symbol = 'diamond'
-        
-        # Add component marker
-        fig.add_trace(go.Scatter(
-            x=[component.x],
-            y=[component.y],
-            mode='markers+text' if show_labels else 'markers',
-            marker=dict(
-                size=25,
-                color=color,
-                symbol=symbol,
-                line=dict(width=3, color='white'),
-                opacity=0.9
-            ),
-            text=component.name if show_labels else "",
-            textposition="bottom center",
-            textfont=dict(size=10, color='black', family="Arial"),
-            name=component.type.value,
-            hovertemplate=(
-                f"<b>{component.name}</b><br>"
-                f"Type: {component.type.value}<br>"
-                f"Security Level: {component.security_level.value}<br>"
-                f"Owner: {component.owner}<br>"
-                f"Description: {component.description}<br>"
-                f"<extra></extra>"
-            )
-        ))
-    
-    # Add data flows with enhanced arrows
+
+    # Add components as scatter points
+    component_x = [c.x for c in components]
+    component_y = [c.y for c in components]
+    component_names = [c.name for c in components]
+    component_types = [c.type.value for c in components]
+    component_security_levels = [c.security_level.value for c in components]
+    component_descriptions = [c.description for c in components]
+
+    # Create hover text
+    hover_texts = []
+    for comp in components:
+        tech_list = ", ".join(comp.technologies) if comp.technologies else "None"
+        hover_text = (
+            f"<b>{comp.name}</b><br>"
+            f"Type: {comp.type.value}<br>"
+            f"Security Level: {comp.security_level.value}<br>"
+            f"Data Classification: {comp.data_classification}<br>"
+            f"Owner: {comp.owner}<br>"
+            f"Technologies: {tech_list}<br>"
+            f"Description: {comp.description}"
+        )
+        hover_texts.append(hover_text)
+
+    # Use a list of colors based on component type
+    marker_colors = [component_type_colors.get(c.type, '#6c757d') for c in components] # Default grey for unknown type
+
+    fig.add_trace(go.Scatter(
+        x=component_x,
+        y=component_y,
+        mode='markers' + ('+text' if show_labels else ''),
+        text=component_names if show_labels else None,
+        textposition="bottom center",
+        marker=dict(
+            size=30,
+            symbol='circle', # Can be customized based on type if needed
+            color=marker_colors,
+            line=dict(width=2, color='DarkSlateGrey')
+        ),
+        hovertemplate='%{text}<extra></extra>' if not show_labels else '%{customdata}<extra></extra>',
+        customdata=hover_texts,
+        name='Components'
+    ))
+
+    # Add data flows as arrows
     if show_flows and data_flows:
         for flow in data_flows:
             source_comp = next((c for c in components if c.name == flow.source), None)
             target_comp = next((c for c in components if c.name == flow.target), None)
-            
+
             if source_comp and target_comp:
-                # Determine arrow color based on security
-                arrow_color = '#2ECC71' if flow.encryption else '#E74C3C'
-                arrow_width = 3 if flow.crosses_trust_boundary else 2
-                
+                line_color = 'grey'
+                line_width = 1
+                dash_style = 'solid'
+                if flow.crosses_trust_boundary:
+                    line_color = ENTERPRISE_THEME['warning_color'] # Highlight boundary crossings
+                    line_width = 3
+                    dash_style = 'dash'
+
+                flow_hover_text = (
+                    f"<b>Data Flow: {flow.source} → {flow.target}</b><br>"
+                    f"Data Type: {flow.data_type}<br>"
+                    f"Protocol: {flow.protocol}{f':{flow.port}' if flow.port else ''}<br>"
+                    f"Encryption: {'Yes' if flow.encryption else 'No'}<br>"
+                    f"Authentication: {'Required' if flow.authentication_required else 'Not Required'}<br>"
+                    f"Crosses Trust Boundary: {'Yes' if flow.crosses_trust_boundary else 'No'}"
+                    f"{f' ({flow.trust_boundary_crossed})' if flow.crosses_trust_boundary else ''}<br>"
+                    f"Description: {flow.description}"
+                )
+
                 fig.add_annotation(
                     x=target_comp.x,
                     y=target_comp.y,
                     ax=source_comp.x,
                     ay=source_comp.y,
-                    xref="x", yref="y",
-                    axref="x", ayref="y",
+                    xref="x", yref="y", axref="x", ayref="y",
                     showarrow=True,
-                    arrowhead=2,
-                    arrowsize=1.5,
-                    arrowwidth=arrow_width,
-                    arrowcolor=arrow_color,
-                    text=f"{flow.data_type}<br>({flow.protocol})" if show_flows else "",
-                    textangle=0,
-                    font=dict(size=8, color=arrow_color),
-                    bgcolor="white",
-                    bordercolor=arrow_color,
-                    borderwidth=1,
-                    opacity=0.8
+                    arrowhead=2, # Arrowhead style
+                    arrowsize=1,
+                    arrowwidth=line_width,
+                    arrowcolor=line_color,
+                    hovertext=flow_hover_text,
+                    hoverlabel=dict(bgcolor="white", font_size=10, font_family="Arial"),
+                    # Set the line style
+                    line=dict(
+                        color=line_color,
+                        width=line_width,
+                        dash=dash_style
+                    )
                 )
-    
-    # Enhanced layout
+
     fig.update_layout(
-        title=dict(
-            text="🏗️ System Architecture Diagram",
-            font=dict(size=20, color=ENTERPRISE_THEME['text_color']),
-            x=0.5
-        ),
-        showlegend=True,
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
-        ),
-        width=1000,
-        height=700,
+        title_text="System Architecture Diagram",
         xaxis=dict(
-            showgrid=True,
-            gridcolor='rgba(128,128,128,0.2)',
+            showgrid=False,
             zeroline=False,
-            showticklabels=False,
-            title=""
+            visible=False,
+            range=[0, 11] # Adjust range based on expected component positions
         ),
         yaxis=dict(
-            showgrid=True,
-            gridcolor='rgba(128,128,128,0.2)',
+            showgrid=False,
             zeroline=False,
-            showticklabels=False,
-            title=""
+            visible=False,
+            scaleanchor="x",
+            scaleratio=1,
+            range=[0, 11] # Adjust range
         ),
-        plot_bgcolor='rgba(248,249,250,0.8)',
-        paper_bgcolor='white'
+        hovermode="closest",
+        showlegend=False,
+        height=600,
+        plot_bgcolor=ENTERPRISE_THEME['background_color'],
+        paper_bgcolor=ENTERPRISE_THEME['background_color'],
+        margin=dict(l=20, r=20, t=50, b=20)
     )
-    
+
     return fig
 
-def render_project_info_sidebar():
-    """Render project information in sidebar"""
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📋 Project Information")
+# Part 3: Threat Modeling and Risk Management
+def render_threat_management():
+    """Render threat identification and management section"""
+    st.subheader("🚨 Threat Identification & Management")
     
-    # Project details
-    st.sidebar.text_input("Project Name", 
-                         value=st.session_state.get('project_name', 'New Threat Model'),
-                         key="project_name_input")
-    
-    st.sidebar.selectbox("Project Status", 
-                        ["Draft", "In Review", "Approved", "Archived"],
-                        key="project_status")
-    
-    st.sidebar.text_area("Project Description", 
-                        placeholder="Describe the scope and purpose of this threat model...",
-                        key="project_description")
-    
-    # Statistics
-    st.sidebar.markdown("### 📊 Statistics")
-    stats_data = {
-        "Components": len(st.session_state.get('components', [])),
-        "Data Flows": len(st.session_state.get('data_flows', [])),
-        "Trust Boundaries": len(st.session_state.get('trust_boundaries', [])),
-        "Threats": len(st.session_state.get('threats', []))
-    }
-    
-    for key, value in stats_data.items():
-        st.sidebar.metric(key, value)
-    
-    # Quick actions
-    st.sidebar.markdown("### ⚡ Quick Actions")
-    if st.sidebar.button("🔄 Refresh Analysis"):
-        st.rerun()
-    
-    if st.sidebar.button("📊 Generate Report"):
-        st.info("Report generation available in full version")
-    
-    if st.sidebar.button("💾 Save Project"):
-        st.success("Project saved successfully!")
+    st.info("💡 Leverage automated threat patterns or manually add threats.")
 
-def render_navigation_menu():
-    """Render enhanced navigation menu"""
-    st.sidebar.title("🧭 Navigation")
-    
-    # Main navigation
-    main_pages = {
-        "🏠 Dashboard": "dashboard",
-        "🏗️ Architecture Builder": "architecture",
-        "🔍 Threat Analysis": "threats",
-        "📊 Risk Assessment": "risk",
-        "📚 Knowledge Base": "knowledge",
-        "⚙️ Settings": "settings"
-    }
-    
-    selected_page = st.sidebar.selectbox(
-        "Select Page",
-        list(main_pages.keys()),
-        key="main_navigation"
+    # Option to select components for threat analysis
+    available_components_for_threats = [c.name for c in st.session_state.components]
+    selected_components_for_threat = st.multiselect(
+        "Select Components to Analyze for Threats (e.g., 'Web Server')",
+        available_components_for_threats,
+        key="threat_comp_select"
     )
-    
-    # Sample architectures section
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📖 Sample Architectures")
-    
-    sample_options = [
-        "🏦 Online Banking",
-        "🛒 E-commerce Platform",
-        "🏥 Healthcare System",
-        "☁️ Cloud Infrastructure",
-        "🏭 Industrial IoT"
-    ]
-    
-    selected_sample = st.sidebar.selectbox(
-        "Load Sample",
-        ["Select a sample..."] + sample_options,
-        key="sample_selection"
-    )
-    
-    return main_pages.get(selected_page, "dashboard"), selected_sample
 
-# This completes Part 2 - Enterprise-Grade UI Components
-# Part 3 will focus on Commercial Features & Security
+    # Automated threat generation based on selected components/types
+    if st.button("⚡ Generate Suggested Threats", type="secondary"):
+        generated_count = 0
+        for comp_name in selected_components_for_threat:
+            comp_obj = next((c for c in st.session_state.components if c.name == comp_name), None)
+            if comp_obj:
+                # Threat patterns based on component type and common scenarios
+                threat_categories_to_check = []
+                if comp_obj.type == ComponentType.PROCESS:
+                    threat_categories_to_check.extend(["Web Application", "API"]) # Simplistic mapping
+                elif comp_obj.type == ComponentType.DATA_STORE:
+                    threat_categories_to_check.append("Web Application") # For SQL injection etc.
+                # Add more sophisticated logic here based on technologies, data classification, etc.
 
+                # Also consider "Trust Boundary" threats if the component is part of one
+                is_in_boundary = False
+                for boundary in st.session_state.trust_boundaries:
+                    if comp_obj.name in boundary.components:
+                        is_in_boundary = True
+                        break
+                if is_in_boundary:
+                    threat_categories_to_check.append("Trust Boundary")
 
-# Part 3: Commercial Features & Security Implementation
-# This builds upon Parts 1 & 2 with enterprise-grade features
+                for category in threat_categories_to_check:
+                    if category in ENHANCED_THREAT_PATTERNS:
+                        for threat_template in ENHANCED_THREAT_PATTERNS[category]:
+                            # Only add if not already present (based on name and affecting component)
+                            if not any(t.name == threat_template.name and comp_obj.name in t.affected_components for t in st.session_state.threats):
+                                new_threat = Threat(
+                                    id=generate_id("THRT_"),
+                                    name=threat_template.name,
+                                    description=threat_template.description.replace("affected_components", comp_obj.name), # Customize desc
+                                    affected_components=[comp_obj.name],
+                                    stride_category=threat_template.stride_category,
+                                    severity=threat_template.severity,
+                                    mitigation=threat_template.mitigation,
+                                    likelihood=threat_template.likelihood,
+                                    impact=threat_template.impact,
+                                    risk_score=calculate_risk_score(threat_template.likelihood, threat_template.impact),
+                                    created_at=datetime.now(),
+                                    updated_at=datetime.now()
+                                )
+                                st.session_state.threats.append(new_threat)
+                                generated_count += 1
+        if generated_count > 0:
+            st.success(f"Generated {generated_count} suggested threats for selected components.")
+            st.rerun()
+        else:
+            st.info("No new suggested threats found for the selected components based on existing patterns, or they already exist.")
 
-import streamlit as st
-import pandas as pd
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime, timedelta
-import json
-import hashlib
-import base64
-from typing import Dict, List, Optional
-import io
-import time
-from enum import Enum
-from dataclasses import dataclass, field
-import uuid
+    st.markdown("---")
+    # Manual Threat Creation Form
+    with st.expander("➕ Manually Add a Threat"):
+        with st.form("add_threat_form", clear_on_submit=True):
+            col_t1, col_t2 = st.columns(2)
+            with col_t1:
+                threat_name = st.text_input("Threat Name*", placeholder="e.g., Unauthorized Access")
+                threat_description = st.text_area("Description", placeholder="Detailed explanation of the threat")
+                affected_comps = st.multiselect("Affected Components*", [c.name for c in st.session_state.components if c.name not in ["Trust Boundary"]])
+                stride_cat = st.selectbox("STRIDE Category*", [s.value for s in StrideCategory])
+            with col_t2:
+                severity = st.selectbox("Severity*", [s.value for s in ThreatSeverity])
+                likelihood = st.selectbox("Likelihood", ["Low", "Medium", "High"])
+                impact = st.selectbox("Impact", ["Low", "Medium", "High", "Critical"])
+                mitigation = st.text_area("Proposed Mitigation", placeholder="Steps to address this threat")
+                due_date_input = st.date_input("Due Date (Optional)", value=None, min_value=datetime.now().date())
+                assigned_to = st.text_input("Assigned To", value="Unassigned")
 
-# Authentication and User Management
-class UserRole(Enum):
-    ADMIN = "Administrator"
-    SECURITY_ANALYST = "Security Analyst"
-    ARCHITECT = "Security Architect"
-    AUDITOR = "Auditor"
-    VIEWER = "Viewer"
+            submit_threat = st.form_submit_button("➕ Add Threat", type="primary")
 
-@dataclass
-class User:
-    id: str
-    username: str
-    email: str
-    role: UserRole
-    organization: str
-    department: str
-    last_login: datetime
-    permissions: List[str] = field(default_factory=list)
-    is_active: bool = True
-    created_at: datetime = field(default_factory=datetime.now)
-
-@dataclass
-class AuditLog:
-    id: str
-    user_id: str
-    action: str
-    resource_type: str
-    resource_id: str
-    timestamp: datetime
-    details: Dict
-    ip_address: str = "Unknown"
-    user_agent: str = "Unknown"
-
-# Core data structures (from previous parts)
-class ComponentType(Enum):
-    WEB_APPLICATION = "Web Application"
-    DATABASE = "Database"
-    API_SERVICE = "API Service"
-    EXTERNAL_SERVICE = "External Service"
-    USER_INTERFACE = "User Interface"
-    LOAD_BALANCER = "Load Balancer"
-    CACHE = "Cache"
-    MESSAGE_QUEUE = "Message Queue"
-    FILE_STORAGE = "File Storage"
-    AUTHENTICATION_SERVICE = "Authentication Service"
-
-class TrustLevel(Enum):
-    PUBLIC = "Public"
-    AUTHENTICATED = "Authenticated"
-    PRIVILEGED = "Privileged"
-    RESTRICTED = "Restricted"
-
-class StrideCategory(Enum):
-    SPOOFING = "Spoofing"
-    TAMPERING = "Tampering"
-    REPUDIATION = "Repudiation"
-    INFORMATION_DISCLOSURE = "Information Disclosure"
-    DENIAL_OF_SERVICE = "Denial of Service"
-    ELEVATION_OF_PRIVILEGE = "Elevation of Privilege"
-
-class ThreatSeverity(Enum):
-    LOW = "Low"
-    MEDIUM = "Medium"
-    HIGH = "High"
-    CRITICAL = "Critical"
-
-@dataclass
-class Component:
-    id: str
-    name: str
-    type: ComponentType
-    description: str
-    trust_level: TrustLevel
-    technologies: List[str] = field(default_factory=list)
-    security_controls: List[str] = field(default_factory=list)
-    created_at: datetime = field(default_factory=datetime.now)
-
-@dataclass
-class DataFlow:
-    id: str
-    source: str
-    destination: str
-    data_type: str
-    protocol: str
-    encryption: bool
-    authentication_required: bool
-    description: str = ""
-    created_at: datetime = field(default_factory=datetime.now)
-
-@dataclass
-class Threat:
-    id: str
-    name: str
-    description: str
-    affected_components: List[str]
-    stride_category: StrideCategory
-    severity: ThreatSeverity
-    likelihood: str
-    impact: str
-    risk_score: float
-    mitigation: str
-    status: str = "Open"
-    assigned_to: str = ""
-    created_at: datetime = field(default_factory=datetime.now)
-
-def generate_id(prefix: str = "") -> str:
-    """Generate unique ID"""
-    return f"{prefix}{str(uuid.uuid4())[:8]}"
-
-# Enhanced security features
-def authenticate_user(username: str, password: str) -> Optional[User]:
-    """Simulate user authentication - in production, integrate with SSO/LDAP"""
-    # Demo users for testing
-    demo_users = {
-        "admin": User(
-            id="usr_admin",
-            username="admin",
-            email="admin@enterprise.com",
-            role=UserRole.ADMIN,
-            organization="Enterprise Corp",
-            department="IT Security",
-            last_login=datetime.now(),
-            permissions=["read", "write", "delete", "admin"]
-        ),
-        "analyst": User(
-            id="usr_analyst",
-            username="analyst",
-            email="analyst@enterprise.com",
-            role=UserRole.SECURITY_ANALYST,
-            organization="Enterprise Corp",
-            department="Security",
-            last_login=datetime.now(),
-            permissions=["read", "write"]
-        ),
-        "viewer": User(
-            id="usr_viewer",
-            username="viewer",
-            email="viewer@enterprise.com",
-            role=UserRole.VIEWER,
-            organization="Enterprise Corp",
-            department="Audit",
-            last_login=datetime.now(),
-            permissions=["read"]
-        )
-    }
-    
-    # Simple password check (in production, use proper hashing)
-    if username in demo_users and password == "demo123":
-        return demo_users[username]
-    
-    return None
-
-def log_audit_event(user_id: str, action: str, resource_type: str, resource_id: str, details: Dict):
-    """Log audit events for compliance"""
-    if 'audit_logs' not in st.session_state:
-        st.session_state.audit_logs = []
-    
-    log_entry = AuditLog(
-        id=generate_id("LOG_"),
-        user_id=user_id,
-        action=action,
-        resource_type=resource_type,
-        resource_id=resource_id,
-        timestamp=datetime.now(),
-        details=details
-    )
-    
-    st.session_state.audit_logs.append(log_entry)
-
-def check_permission(required_permission: str) -> bool:
-    """Check if current user has required permission"""
-    current_user = st.session_state.get('current_user')
-    if not current_user:
-        return False
-    
-    return required_permission in current_user.permissions
-
-def render_login_page():
-    """Render professional login page"""
-    st.markdown("""
-    <div style="max-width: 400px; margin: 5rem auto; padding: 2rem; 
-                background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-        <div style="text-align: center; margin-bottom: 2rem;">
-            <h1 style="color: #1f77b4; margin: 0;">🛡️ ThreatModel Enterprise</h1>
-            <p style="color: #666; margin: 0.5rem 0;">Secure Access Portal</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    with st.form("login_form"):
-        username = st.text_input("Username", placeholder="Enter your username")
-        password = st.text_input("Password", type="password", placeholder="Enter your password")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            login_btn = st.form_submit_button("🔐 Login", type="primary", use_container_width=True)
-        with col2:
-            demo_btn = st.form_submit_button("🎯 Demo Access", use_container_width=True)
-        
-        if login_btn:
-            user = authenticate_user(username, password)
-            if user:
-                st.session_state.current_user = user
-                st.session_state.authenticated = True
-                log_audit_event(user.id, "LOGIN", "SYSTEM", "AUTH", {"username": username})
-                st.success("✅ Login successful!")
+            if submit_threat and threat_name and affected_comps and stride_cat and severity:
+                calculated_risk_score = calculate_risk_score(likelihood, impact)
+                new_threat = Threat(
+                    id=generate_id("THRT_"),
+                    name=threat_name,
+                    description=threat_description,
+                    affected_components=affected_comps,
+                    stride_category=StrideCategory(stride_cat),
+                    severity=ThreatSeverity(severity),
+                    mitigation=mitigation,
+                    likelihood=likelihood,
+                    impact=impact,
+                    risk_score=calculated_risk_score,
+                    status="Open",
+                    assigned_to=assigned_to,
+                    due_date=datetime.combine(due_date_input, datetime.min.time()) if due_date_input else None
+                )
+                st.session_state.threats.append(new_threat)
+                st.success(f"✅ Threat '{threat_name}' added successfully!")
                 st.rerun()
-            else:
-                st.error("❌ Invalid credentials")
-        
-        if demo_btn:
-            demo_user = authenticate_user("analyst", "demo123")
-            st.session_state.current_user = demo_user
-            st.session_state.authenticated = True
-            st.info("🎯 Demo mode activated - Security Analyst role")
-            st.rerun()
     
-    st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Demo credentials info
-    st.markdown("""
-    <div style="max-width: 400px; margin: 2rem auto; padding: 1rem; 
-                background: #f8f9fa; border-radius: 5px; border-left: 4px solid #17a2b8;">
-        <h4 style="color: #17a2b8; margin: 0 0 1rem 0;">🎯 Demo Credentials</h4>
-        <p style="margin: 0.5rem 0;"><strong>Admin:</strong> admin / demo123</p>
-        <p style="margin: 0.5rem 0;"><strong>Analyst:</strong> analyst / demo123</p>
-        <p style="margin: 0.5rem 0;"><strong>Viewer:</strong> viewer / demo123</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("---")
+    # Threat Table and Management
+    st.subheader("📊 Identified Threats")
 
-def render_user_profile():
-    """Render user profile section"""
-    if not st.session_state.get('authenticated'):
+    if not st.session_state.threats:
+        st.info("No threats identified yet.")
         return
-    
-    current_user = st.session_state.current_user
-    
-    with st.expander("👤 User Profile"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.write(f"**Name:** {current_user.username}")
-            st.write(f"**Email:** {current_user.email}")
-            st.write(f"**Role:** {current_user.role.value}")
-        
-        with col2:
-            st.write(f"**Organization:** {current_user.organization}")
-            st.write(f"**Department:** {current_user.department}")
-            st.write(f"**Last Login:** {current_user.last_login.strftime('%Y-%m-%d %H:%M')}")
-        
-        if st.button("🚪 Logout"):
-            log_audit_event(current_user.id, "LOGOUT", "SYSTEM", "AUTH", {})
-            st.session_state.authenticated = False
-            st.session_state.current_user = None
-            st.rerun()
 
-def render_metrics_dashboard():
-    """Render key metrics dashboard"""
-    threats = st.session_state.get('threats', [])
-    components = st.session_state.get('components', [])
-    data_flows = st.session_state.get('data_flows', [])
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("🎯 Total Threats", len(threats))
-    
-    with col2:
-        critical_threats = len([t for t in threats if t.severity == ThreatSeverity.CRITICAL])
-        st.metric("🔥 Critical Threats", critical_threats)
-    
-    with col3:
-        st.metric("🏗️ Components", len(components))
-    
-    with col4:
-        unencrypted_flows = len([f for f in data_flows if not f.encryption])
-        st.metric("⚠️ Unencrypted Flows", unencrypted_flows)
-
-def render_dashboard():
-    """Render executive dashboard with KPIs"""
-    st.header("📊 Executive Dashboard")
-    
-    # KPI Metrics
-    render_metrics_dashboard()
-    
-    # Risk heatmap
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        render_risk_heatmap()
-    
-    with col2:
-        render_threat_timeline()
-    
-    # Recent activities
-    st.subheader("📋 Recent Activities")
-    render_recent_activities()
-    
-    # Compliance status
-    st.subheader("✅ Compliance Status")
-    render_compliance_dashboard()
-
-def render_risk_heatmap():
-    """Render risk assessment heatmap"""
-    st.subheader("🔥 Risk Heat Map")
-    
-    # Generate sample risk data
-    risk_data = []
-    threats = st.session_state.get('threats', [])
-    
-    if threats:
-        for threat in threats:
-            likelihood_score = {"Low": 1, "Medium": 2, "High": 3}.get(threat.likelihood, 2)
-            impact_score = {"Low": 1, "Medium": 2, "High": 3, "Critical": 4}.get(threat.impact, 2)
-            
-            risk_data.append({
-                "Threat": threat.name[:20] + "..." if len(threat.name) > 20 else threat.name,
-                "Likelihood": likelihood_score,
-                "Impact": impact_score,
-                "Risk Score": threat.risk_score
-            })
-    else:
-        # Sample data for demonstration
-        risk_data = [
-            {"Threat": "SQL Injection", "Likelihood": 2, "Impact": 3, "Risk Score": 7.5},
-            {"Threat": "XSS Attack", "Likelihood": 3, "Impact": 2, "Risk Score": 6.0},
-            {"Threat": "Data Breach", "Likelihood": 1, "Impact": 4, "Risk Score": 8.0},
-            {"Threat": "DDoS Attack", "Likelihood": 3, "Impact": 2, "Risk Score": 6.0}
-        ]
-    
-    df = pd.DataFrame(risk_data)
-    
-    fig = px.scatter(df, x="Likelihood", y="Impact", size="Risk Score", 
-                    hover_name="Threat", color="Risk Score",
-                    color_continuous_scale="Reds",
-                    title="Risk Assessment Matrix")
-    
-    fig.update_layout(
-        xaxis_title="Likelihood",
-        yaxis_title="Impact",
-        height=400
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-
-def render_threat_timeline():
-    """Render threat discovery timeline"""
-    st.subheader("📈 Threat Discovery Timeline")
-    
-    # Generate timeline data
-    threats = st.session_state.get('threats', [])
-    
-    if threats:
-        timeline_data = []
-        for threat in threats:
-            timeline_data.append({
-                "Date": threat.created_at.date(),
-                "Threat": threat.name,
-                "Severity": threat.severity.value,
-                "Count": 1
-            })
-        
-        df = pd.DataFrame(timeline_data)
-        daily_counts = df.groupby(["Date", "Severity"]).count().reset_index()
-        
-        fig = px.line(daily_counts, x="Date", y="Count", color="Severity",
-                     title="Daily Threat Discovery")
-        
-        fig.update_layout(height=400)
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("No threats identified yet. Run threat analysis to populate timeline.")
-
-def render_recent_activities():
-    """Render recent user activities"""
-    audit_logs = st.session_state.get('audit_logs', [])
-    
-    if audit_logs:
-        recent_logs = sorted(audit_logs, key=lambda x: x.timestamp, reverse=True)[:10]
-        
-        activity_data = []
-        for log in recent_logs:
-            activity_data.append({
-                "Timestamp": log.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                "User": log.user_id,
-                "Action": log.action,
-                "Resource": f"{log.resource_type}/{log.resource_id}",
-                "Details": str(log.details)
-            })
-        
-        df = pd.DataFrame(activity_data)
-        st.dataframe(df, use_container_width=True, hide_index=True)
-    else:
-        st.info("No recent activities recorded.")
-
-def render_compliance_dashboard():
-    """Render compliance status dashboard"""
-    compliance_frameworks = {
-        "PCI DSS": {"status": "Compliant", "score": 95, "color": "#28a745"},
-        "SOC 2": {"status": "In Progress", "score": 75, "color": "#ffc107"},
-        "ISO 27001": {"status": "Compliant", "score": 90, "color": "#28a745"},
-        "GDPR": {"status": "Non-Compliant", "score": 60, "color": "#dc3545"},
-        "HIPAA": {"status": "N/A", "score": 0, "color": "#6c757d"}
-    }
-    
-    cols = st.columns(len(compliance_frameworks))
-    
-    for i, (framework, data) in enumerate(compliance_frameworks.items()):
-        with cols[i]:
-            st.metric(
-                label=framework,
-                value=f"{data['score']}%",
-                delta=data['status']
-            )
-            
-            # Progress bar
-            st.markdown(f"""
-            <div style="background: #f0f0f0; border-radius: 10px; overflow: hidden;">
-                <div style="background: {data['color']}; width: {data['score']}%; 
-                           height: 10px; transition: width 0.3s ease;"></div>
-            </div>
-            """, unsafe_allow_html=True)
-
-def render_advanced_threat_analysis():
-    """Render advanced threat analysis with ML insights"""
-    st.header("🔬 Advanced Threat Analysis")
-    
-    if not check_permission("write"):
-        st.warning("⚠️ You don't have permission to modify threat analysis.")
-        return
-    
-    # AI-powered threat detection
-    st.subheader("🤖 AI-Powered Threat Detection")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔍 Run AI Analysis", type="primary"):
-            with st.spinner("Analyzing architecture with AI..."):
-                # Simulate AI analysis
-                time.sleep(2)
-                st.success("✅ AI analysis completed!")
-                
-                # Generate AI-suggested threats
-                ai_threats = generate_ai_threats()
-                st.session_state.ai_suggested_threats = ai_threats
-    
-    with col2:
-        confidence_threshold = st.slider("Confidence Threshold", 0.0, 1.0, 0.7)
-    
-    # Display AI suggestions
-    if 'ai_suggested_threats' in st.session_state:
-        st.subheader("🎯 AI-Suggested Threats")
-        
-        for threat in st.session_state.ai_suggested_threats:
-            if threat.get('confidence', 0) >= confidence_threshold:
-                with st.expander(f"⚠️ {threat['name']} (Confidence: {threat['confidence']:.1%})"):
-                    st.write(f"**Description:** {threat['description']}")
-                    st.write(f"**STRIDE Category:** {threat['stride_category']}")
-                    st.write(f"**Suggested Mitigation:** {threat['mitigation']}")
-                    
-                    if st.button(f"➕ Add {threat['name']}", key=f"add_{threat['id']}"):
-                        # Add threat to main list
-                        new_threat = Threat(
-                            id=threat['id'],
-                            name=threat['name'],
-                            description=threat['description'],
-                            affected_components=threat['affected_components'],
-                            stride_category=StrideCategory(threat['stride_category']),
-                            severity=ThreatSeverity(threat['severity']),
-                            likelihood="Medium",
-                            impact="Medium",
-                            risk_score=5.0,
-                            mitigation=threat['mitigation']
-                        )
-                        
-                        if 'threats' not in st.session_state:
-                            st.session_state.threats = []
-                        st.session_state.threats.append(new_threat)
-                        
-                        # Log the action
-                        log_audit_event(
-                            st.session_state.current_user.id,
-                            "CREATE",
-                            "THREAT",
-                            new_threat.id,
-                            {"threat_name": threat['name']}
-                        )
-                        
-                        st.success(f"✅ Added threat: {threat['name']}")
-                        st.rerun()
-
-def generate_ai_threats():
-    """Generate AI-suggested threats based on architecture"""
-    components = st.session_state.get('components', [])
-    data_flows = st.session_state.get('data_flows', [])
-    
-    ai_threats = []
-    
-    # Analyze for common patterns
-    web_components = [c for c in components if 'web' in c.name.lower() or 'api' in c.name.lower()]
-    db_components = [c for c in components if 'database' in c.name.lower() or 'db' in c.name.lower()]
-    
-    if web_components:
-        ai_threats.append({
-            'id': generate_id("AI_"),
-            'name': "Web Application Firewall Bypass",
-            'description': "Advanced techniques to bypass WAF protection",
-            'stride_category': "Tampering",
-            'severity': "High",
-            'mitigation': "Implement advanced WAF rules and behavioral analysis",
-            'affected_components': [c.name for c in web_components],
-            'confidence': 0.85
-        })
-    
-    if db_components:
-        ai_threats.append({
-            'id': generate_id("AI_"),
-            'name': "Database Privilege Escalation",
-            'description': "Exploiting database misconfigurations for privilege escalation",
-            'stride_category': "Elevation of Privilege",
-            'severity': "Critical",
-            'mitigation': "Implement database security hardening and monitoring",
-            'affected_components': [c.name for c in db_components],
-            'confidence': 0.78
-        })
-    
-    # Check for unencrypted flows
-    unencrypted_flows = [f for f in data_flows if not f.encryption]
-    if unencrypted_flows:
-        ai_threats.append({
-            'id': generate_id("AI_"),
-            'name': "Man-in-the-Middle Attack on Unencrypted Flows",
-            'description': "Interception of unencrypted data flows",
-            'stride_category': "Information Disclosure",
-            'severity': "High",
-            'mitigation': "Implement end-to-end encryption for all data flows",
-            'affected_components': [f.source for f in unencrypted_flows],
-            'confidence': 0.92
-        })
-    
-    return ai_threats
-
-def generate_executive_report():
-    """Generate executive summary report"""
-    threats = st.session_state.get('threats', [])
-    components = st.session_state.get('components', [])
-    
-    report = {
-        "title": "Executive Security Summary",
-        "generated_at": datetime.now().isoformat(),
-        "summary": {
-            "total_threats": len(threats),
-            "critical_threats": len([t for t in threats if t.severity == ThreatSeverity.CRITICAL]),
-            "high_threats": len([t for t in threats if t.severity == ThreatSeverity.HIGH]),
-            "components_analyzed": len(components)
-        },
-        "key_findings": [
-            "Architecture analysis completed with AI-powered threat detection",
-            "Critical vulnerabilities identified in authentication flows",
-            "Encryption gaps found in data transmission layers"
-        ],
-        "recommendations": [
-            "Implement multi-factor authentication across all systems",
-            "Enable end-to-end encryption for sensitive data flows",
-            "Establish continuous security monitoring and alerting"
-        ]
-    }
-    
-    # Convert to downloadable JSON
-    report_json = json.dumps(report, indent=2)
-    
-    st.download_button(
-        label="📄 Download Executive Report",
-        data=report_json,
-        file_name=f"executive_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-        mime="application/json"
-    )
-    
-    st.success("✅ Executive report generated successfully!")
-
-def generate_risk_report():
-    """Generate detailed risk assessment report"""
-    threats = st.session_state.get('threats', [])
-    
-    risk_report = {
-        "title": "Risk Assessment Report",
-        "generated_at": datetime.now().isoformat(),
-        "threats": []
-    }
-    
-    for threat in threats:
-        risk_report["threats"].append({
-            "id": threat.id,
-            "name": threat.name,
-            "description": threat.description,
-            "severity": threat.severity.value,
-            "likelihood": threat.likelihood,
-            "impact": threat.impact,
-            "risk_score": threat.risk_score,
-            "mitigation": threat.mitigation,
-            "status": threat.status,
-            "affected_components": threat.affected_components
-        })
-    
-    # Convert to downloadable JSON
-    report_json = json.dumps(risk_report, indent=2)
-    
-    st.download_button(
-        label="📈 Download Risk Report",
-        data=report_json,
-        file_name=f"risk_assessment_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-        mime="application/json"
-    )
-    
-    st.success("✅ Risk assessment report generated successfully!")
-
-def export_to_json():
-    """Export all data to JSON format"""
-    export_data = {
-        "components": [
-            {
-                "id": c.id,
-                "name": c.name,
-                "type": c.type.value,
-                "description": c.description,
-                "trust_level": c.trust_level.value,
-                "technologies": c.technologies,
-                "security_controls": c.security_controls,
-                "created_at": c.created_at.isoformat()
-            }
-            for c in st.session_state.get('components', [])
-        ],
-        "data_flows": [
-            {
-                "id": f.id,
-                "source": f.source,
-                "destination": f.destination,
-                "data_type": f.data_type,
-                "protocol": f.protocol,
-                "encryption": f.encryption,
-                "authentication_required": f.authentication_required,
-                "description": f.description,
-                "created_at": f.created_at.isoformat()
-            }
-            for f in st.session_state.get('data_flows', [])
-        ],
-        "threats": [
-            {
-                "id": t.id,
-                "name": t.name,
-                "description": t.description,
-                "affected_components": t.affected_components,
-                "stride_category": t.stride_category.value,
-                "severity": t.severity.value,
-                "likelihood": t.likelihood,
-                "impact": t.impact,
-                "risk_score": t.risk_score,
-                "mitigation": t.mitigation,
-                "status": t.status,
-                "assigned_to": t.assigned_to,
-                "created_at": t.created_at.isoformat()
-            }
-            for t in st.session_state.get('threats', [])
-        ],
-        "exported_at": datetime.now().isoformat(),
-        "exported_by": st.session_state.current_user.username
-    }
-    
-    # Convert to downloadable JSON
-    export_json = json.dumps(export_data, indent=2)
-    
-    st.download_button(
-        label="💾 Download Complete Data Export",
-        data=export_json,
-        file_name=f"threat_model_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-        mime="application/json"
-    )
-    
-    # Log export activity
-    log_audit_event(
-        st.session_state.current_user.id,
-        "EXPORT",
-        "DATA",
-        "FULL_EXPORT",
-        {"export_type": "JSON", "components": len(export_data['components'])}
-    )
-    
-    st.success("✅ Data exported successfully!")
-
-def export_to_csv():
-    """Export threats to CSV format"""
-    threats = st.session_state.get('threats', [])
-    
-    if not threats:
-        st.warning("No threats to export.")
-        return
-    
-    # Convert threats to DataFrame
-    threat_data = []
-    for threat in threats:
-        threat_data.append({
+    threat_df_data = []
+    for threat in st.session_state.threats:
+        threat_df_data.append({
             "ID": threat.id,
-            "Name": threat.name,
+            "Threat Name": threat.name,
             "Description": threat.description,
+            "Affected Components": ", ".join(threat.affected_components),
             "STRIDE Category": threat.stride_category.value,
             "Severity": threat.severity.value,
             "Likelihood": threat.likelihood,
             "Impact": threat.impact,
-            "Risk Score": threat.risk_score,
+            "Risk Score": f"{threat.risk_score:.1f}",
             "Mitigation": threat.mitigation,
             "Status": threat.status,
             "Assigned To": threat.assigned_to,
-            "Created At": threat.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            "Due Date": threat.due_date.strftime("%Y-%m-%d") if threat.due_date else "N/A",
+            "Last Updated": threat.updated_at.strftime("%Y-%m-%d %H:%M")
         })
+    threat_df = pd.DataFrame(threat_df_data)
+
+    # Filters for threats
+    filter_t1, filter_t2, filter_t3, filter_t4 = st.columns(4)
+    with filter_t1:
+        severity_filter = st.selectbox("Filter by Severity", ["All"] + [s.value for s in ThreatSeverity], key="threat_sev_filter")
+    with filter_t2:
+        stride_filter = st.selectbox("Filter by STRIDE Category", ["All"] + [s.value for s in StrideCategory], key="threat_stride_filter")
+    with filter_t3:
+        status_filter = st.selectbox("Filter by Status", ["All", "Open", "Mitigated", "In Progress", "Closed"], key="threat_status_filter")
+    with filter_t4:
+        assignee_filter_options = ["All"] + sorted(list(set([t.assigned_to for t in st.session_state.threats if t.assigned_to != "Unassigned"]))) + ["Unassigned"]
+        assigned_to_filter = st.selectbox("Filter by Assignee", assignee_filter_options, key="threat_assignee_filter")
+
+
+    filtered_threat_df = threat_df.copy()
+    if severity_filter != "All":
+        filtered_threat_df = filtered_threat_df[filtered_threat_df["Severity"] == severity_filter]
+    if stride_filter != "All":
+        filtered_threat_df = filtered_threat_df[filtered_threat_df["STRIDE Category"] == stride_filter]
+    if status_filter != "All":
+        filtered_threat_df = filtered_threat_df[filtered_threat_df["Status"] == status_filter]
+    if assigned_to_filter != "All":
+        filtered_threat_df = filtered_threat_df[filtered_threat_df["Assigned To"] == assigned_to_filter]
+
+    st.dataframe(filtered_threat_df, use_container_width=True, hide_index=True)
+
+    # Threat Management Actions (Edit/Delete)
+    st.markdown("---")
+    st.subheader("Threat Management Actions")
+    threat_action_col1, threat_action_col2 = st.columns(2)
+
+    with threat_action_col1:
+        threat_to_edit_id = st.selectbox(
+            "Select Threat to Edit",
+            [""] + [t.id for t in st.session_state.threats],
+            format_func=lambda x: next((f"{t.name} (ID: {t.id})" for t in st.session_state.threats if t.id == x), x),
+            key="edit_threat_select"
+        )
+        if threat_to_edit_id:
+            selected_threat = next((t for t in st.session_state.threats if t.id == threat_to_edit_id), None)
+            if selected_threat:
+                with st.expander(f"Edit Threat: {selected_threat.name}"):
+                    edit_threat_form(selected_threat)
+
+    with threat_action_col2:
+        threat_to_delete_id = st.selectbox(
+            "Select Threat to Delete",
+            [""] + [t.id for t in st.session_state.threats],
+            format_func=lambda x: next((f"{t.name} (ID: {t.id})" for t in st.session_state.threats if t.id == x), x),
+            key="delete_threat_select"
+        )
+        if st.button("🗑️ Delete Selected Threat", type="secondary", disabled=threat_to_delete_id == ""):
+            if threat_to_delete_id:
+                delete_threat(threat_to_delete_id)
+
+    st.markdown("---")
+    st.subheader("Risk Score Distribution")
+    if st.session_state.threats:
+        risk_scores = [t.risk_score for t in st.session_state.threats]
+        fig_hist = px.histogram(pd.DataFrame({"Risk Score": risk_scores}), x="Risk Score", nbins=10,
+                                title="Distribution of Risk Scores",
+                                color_discrete_sequence=[ENTERPRISE_THEME['primary_color']])
+        fig_hist.update_layout(xaxis_title="Risk Score (0-15)", yaxis_title="Number of Threats")
+        st.plotly_chart(fig_hist, use_container_width=True)
+    else:
+        st.info("No threats to display risk score distribution.")
+
+def edit_threat_form(threat: Threat):
+    """Renders a form to edit an existing threat."""
+    with st.form(f"edit_threat_form_{threat.id}"):
+        edited_name = st.text_input("Threat Name*", threat.name, key=f"edit_t_name_{threat.id}")
+        edited_description = st.text_area("Description", threat.description, key=f"edit_t_desc_{threat.id}")
+        
+        current_component_names = [c.name for c in st.session_state.components]
+        edited_affected_components = st.multiselect("Affected Components*", current_component_names, default=threat.affected_components, key=f"edit_t_affected_comps_{threat.id}")
+        
+        edited_stride_cat = st.selectbox("STRIDE Category*", [s.value for s in StrideCategory], index=[s.value for s in StrideCategory].index(threat.stride_category.value), key=f"edit_t_stride_{threat.id}")
+        edited_severity = st.selectbox("Severity*", [s.value for s in ThreatSeverity], index=[s.value for s in ThreatSeverity].index(threat.severity.value), key=f"edit_t_severity_{threat.id}")
+        edited_likelihood = st.selectbox("Likelihood", ["Low", "Medium", "High"], index=["Low", "Medium", "High"].index(threat.likelihood), key=f"edit_t_likelihood_{threat.id}")
+        edited_impact = st.selectbox("Impact", ["Low", "Medium", "High", "Critical"], index=["Low", "Medium", "High", "Critical"].index(threat.impact), key=f"edit_t_impact_{threat.id}")
+        edited_mitigation = st.text_area("Proposed Mitigation", threat.mitigation, key=f"edit_t_mitigation_{threat.id}")
+        edited_status = st.selectbox("Status", ["Open", "Mitigated", "In Progress", "Closed"], index=["Open", "Mitigated", "In Progress", "Closed"].index(threat.status), key=f"edit_t_status_{threat.id}")
+        edited_assigned_to = st.text_input("Assigned To", threat.assigned_to, key=f"edit_t_assigned_to_{threat.id}")
+        
+        default_due_date = threat.due_date.date() if threat.due_date else None
+        edited_due_date = st.date_input("Due Date (Optional)", value=default_due_date, min_value=datetime.now().date(), key=f"edit_t_due_date_{threat.id}")
+
+        update_submitted = st.form_submit_button("💾 Update Threat", type="primary")
+
+        if update_submitted:
+            threat.name = edited_name
+            threat.description = edited_description
+            threat.affected_components = edited_affected_components
+            threat.stride_category = StrideCategory(edited_stride_cat)
+            threat.severity = ThreatSeverity(edited_severity)
+            threat.likelihood = edited_likelihood
+            threat.impact = edited_impact
+            threat.risk_score = calculate_risk_score(edited_likelihood, edited_impact)
+            threat.mitigation = edited_mitigation
+            threat.status = edited_status
+            threat.assigned_to = edited_assigned_to
+            threat.due_date = datetime.combine(edited_due_date, datetime.min.time()) if edited_due_date else None
+            threat.updated_at = datetime.now()
+            st.success(f"✅ Threat '{edited_name}' updated successfully!")
+            st.rerun()
+
+def delete_threat(threat_id: str):
+    """Deletes a threat from the session state."""
+    st.session_state.threats = [t for t in st.session_state.threats if t.id != threat_id]
+    st.success("Threat deleted successfully!")
+    st.rerun()
+
+
+# Part 4: Data Persistence and Export/Import
+
+def object_to_dict(obj):
+    """Recursively converts dataclass objects and Enums to dictionaries and their values."""
+    if isinstance(obj, Enum):
+        return obj.value
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, list):
+        return [object_to_dict(item) for item in obj]
+    if isinstance(obj, dict):
+        return {key: object_to_dict(value) for key, value in obj.items()}
+    if hasattr(obj, '__dataclass_fields__'):
+        return {field.name: object_to_dict(getattr(obj, field.name)) for field in obj.__dataclass_fields__.values()}
+    return obj
+
+def dict_to_object(data, cls):
+    """Converts a dictionary back to a dataclass object, handling Enums and datetimes."""
+    if data is None:
+        return None
+    if cls == datetime:
+        return datetime.fromisoformat(data)
+    if issubclass(cls, Enum):
+        return cls(data)
     
-    df = pd.DataFrame(threat_data)
-    csv = df.to_csv(index=False)
+    if hasattr(cls, '__dataclass_fields__'):
+        field_values = {}
+        for field_name, field_type in cls.__dataclass_fields__.items():
+            if field_name in data:
+                field_data = data[field_name]
+                if hasattr(field_type, '__origin__') and field_type.__origin__ is list:
+                    # Handle List[SomeType]
+                    item_type = field_type.__args__[0]
+                    field_values[field_name] = [dict_to_object(item, item_type) for item in field_data]
+                elif hasattr(field_type, '__origin__') and field_type.__origin__ is Optional:
+                    # Handle Optional[SomeType]
+                    actual_type = field_type.__args__[0]
+                    field_values[field_name] = dict_to_object(field_data, actual_type)
+                elif hasattr(field_type, '__dataclass_fields__') or issubclass(field_type, (Enum, datetime)):
+                    field_values[field_name] = dict_to_object(field_data, field_type)
+                else:
+                    field_values[field_name] = field_data
+            # Handle cases where data might be missing for fields with default values
+            elif field_type.default_factory:
+                field_values[field_name] = field_type.default_factory()
+            elif field_type.default != field_type.empty:
+                field_values[field_name] = field_type.default
+
+        return cls(**field_values)
+    return data
+
+def save_project():
+    """Save current project state to a JSON file."""
+    project_data = {
+        "project_id": st.session_state.project_id,
+        "project_name": st.session_state.project_name,
+        "components": object_to_dict(st.session_state.components),
+        "data_flows": object_to_dict(st.session_state.data_flows),
+        "trust_boundaries": object_to_dict(st.session_state.trust_boundaries),
+        "threats": object_to_dict(st.session_state.threats)
+    }
     
+    # Generate a unique filename or use project name
+    filename = f"{st.session_state.project_name.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d%H%M%S')}.json"
+    
+    json_data = json.dumps(project_data, indent=4)
     st.download_button(
-        label="📊 Download Threats CSV",
-        data=csv,
-        file_name=f"threats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-        mime="text/csv"
+        label="📥 Download Threat Model (JSON)",
+        data=json_data,
+        file_name=filename,
+        mime="application/json",
+        type="secondary",
+        help="Download the entire threat model as a JSON file."
     )
-    
-    st.success("✅ Threats exported to CSV successfully!")
+    # Consider adding a backend storage mechanism for true enterprise persistence (e.g., S3, database)
 
-def render_export_options():
-    """Render data export and reporting options"""
-    st.subheader("📤 Export & Reporting")
+def load_project():
+    """Load project state from an uploaded JSON file."""
+    st.subheader("⬆️ Upload Threat Model")
+    uploaded_file = st.file_uploader("Upload a JSON file", type="json")
     
-    if not check_permission("read"):
-        st.warning("⚠️ You don't have permission to export data.")
-        return
-    
-    export_col1, export_col2, export_col3 = st.columns(3)
-    
-    with export_col1:
-        st.write("**📊 Reports**")
-        if st.button("📋 Executive Summary", use_container_width=True):
-            generate_executive_report()
-        
-        if st.button("📈 Risk Assessment", use_container_width=True):
-            generate_risk_report()
-    
-    with export_col2:
-        st.write("**💾 Data Export**")
-        if st.button("📄 Export to JSON", use_container_width=True):
-            export_to_json()
-        
-        if st.button("📊 Export to CSV", use_container_width=True):
-            export_to_csv()
-    
-    with export_col3:
-        st.write("**📋 Audit Logs**")
-        if st.button("📜 Export Audit Logs", use_container_width=True):
-            export_audit_logs()
-        
-        if st.button("🔍 View Audit Trail", use_container_width=True):
-            render_audit_trail()
+    if uploaded_file is not None:
+        try:
+            bytes_data = uploaded_file.getvalue()
+            project_data = json.loads(bytes_data)
+            
+            # Reconstruct dataclass objects
+            st.session_state.project_id = project_data.get("project_id", str(uuid.uuid4()))
+            st.session_state.project_name = project_data.get("project_name", "Loaded Threat Model")
+            st.session_state.components = [dict_to_object(c, Component) for c in project_data.get("components", [])]
+            st.session_state.data_flows = [dict_to_object(df, DataFlow) for df in project_data.get("data_flows", [])]
+            st.session_state.trust_boundaries = [dict_to_object(tb, TrustBoundary) for tb in project_data.get("trust_boundaries", [])]
+            st.session_state.threats = [dict_to_object(t, Threat) for t in project_data.get("threats", [])]
 
-def export_audit_logs():
-    """Export audit logs to JSON"""
-    audit_logs = st.session_state.get('audit_logs', [])
-    
-    if not audit_logs:
-        st.warning("No audit logs to export.")
-        return
-    
-    # Convert audit logs to exportable format
-    logs_data = []
-    for log in audit_logs:
-        logs_data.append({
-            "id": log.id,
-            "user_id": log.user_id,
-            "action": log.action,
-            "resource_type": log.resource_type,
-            "resource_id": log.resource_id,
+            # Ensure data flows are re-analyzed after load, especially if boundaries changed
+            st.session_state.data_flows = analyze_trust_boundary_crossings(
+                st.session_state.data_flows, st.session_state.trust_boundaries
+            )
+            
+            st.success(f"✅ Project '{st.session_state.project_name}' loaded successfully!")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ Error loading project: {e}. Please ensure it's a valid threat model JSON.")
+
+# Part 5: Main App Logic and Enterprise Features
+def main():
+    initialize_session_state()
+
+    st.set_page_config(
+        page_title="ThreatModel Enterprise",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+    # Apply custom CSS for enterprise look and feel
+    st.markdown(f"""
+        <style>
+            .reportview-container {{
+                background: {ENTERPRISE_THEME['background_color']};
+            }}
+            .sidebar .sidebar-content {{
+                background: {ENTERPRISE_THEME['card_background']};
+            }}
+            h1, h2, h3, h4, h5, h6 {{
+                color: {ENTERPRISE_THEME['text_color']};
+            }}
+            .stButton>button {{
+                background-color: {ENTERPRISE_THEME['primary_color']};
+                color: white;
+                border-radius: 5px;
+                border: none;
+                padding: 10px 20px;
+                cursor: pointer;
+            }}
+            .stButton>button:hover {{
+                background-color: #1a649a; /* Darker shade */
+            }}
+            .stSelectbox, .stTextInput, .stTextArea, .stMultiSelect, .stNumberInput {{
+                border: 1px solid {ENTERPRISE_THEME['border_color']};
+                border-radius: 5px;
+            }}
+            .stAlert {{
+                border-radius: 8px;
+            }}
+            /* Specific styles for metrics */
+            div[data-testid="stMetric"] {{
+                background-color: {ENTERPRISE_THEME['card_background']};
+                border-left: 5px solid {ENTERPRISE_THEME['primary_color']};
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            }}
+            div[data-testid="stMetric"] label {{
+                color: {ENTERPRISE_THEME['text_color']};
+                font-weight: bold;
+                font-size: 1.1em;
+            }}
+            div[data-testid="stMetric"] div[data-testid="stMarkdownContainer"] p {{
+                font-size: 2.2em;
+                font-weight: bold;
+                color: {ENTERPRISE_THEME['primary_color']};
+            }}
+            div[data-testid="stMetric"] .css-1qxtbh3.e16fv1bt2 {{ /* delta */
+                font-size: 0.9em;
+                color: {ENTERPRISE_THEME['success_color']};
+            }}
+        </style>
+    """, unsafe_allow_html=True)
+
+    render_header()
+    render_metrics_dashboard()
+
+    st.sidebar.title("🛠️ Navigation")
+    menu = st.sidebar.radio(
+        "Go To",
+        [
+            "🏠 Dashboard",
+            "🏗️ Components",
+            "🔄 Data Flows",
+            "🔐 Trust Boundaries",
+            "🚨 Threats",
+            "🎨 Architecture Diagram",
+            "⬆️ Import/Export"
+        ],
+        index=0 # Default to Dashboard
+    )
+
+    st.markdown("---") # Horizontal line for separation
+
+    if menu == "🏠 Dashboard":
+        st.subheader("🏠 Project Dashboard")
+        st.write(f"**Project Name:** {st.session_state.project_name}")
+        st.write(f"**Project ID:** {st.session_state.project_id}")
+        st.write("Welcome to your Enterprise Threat Modeling platform. Use the sidebar to navigate.")
+        
+        # Display summary cards
+        total_components = len(st.session_state.components)
+        total_data_flows = len(st.session_state.data_flows)
+        total_threats = len(st.session_state.threats)
+        open_threats = len([t for t in st.session_state.threats if t.status == "Open"])
+        critical_high_threats = len([t for t in st.session_state.threats if t.severity in [ThreatSeverity.CRITICAL, ThreatSeverity.HIGH]])
+        
+        st.markdown("---")
+        st.subheader("Quick Overview")
+        col_dash1, col_dash2, col_dash3 = st.columns(3)
+        with col_dash1:
+            render_professional_card("Total Components", f"{total_components}", "🏗️", "primary")
+        with col_dash2:
+            render_professional_card("Total Data Flows", f"{total_data_flows}", "🔄", "info")
+        with col_dash3:
+            render_professional_card("Total Threats", f"{total_threats}", "🚨", "warning")
+        
+        col_dash4, col_dash5, col_dash6 = st.columns(3)
+        with col_dash4:
+            render_professional_card("Open Threats", f"{open_threats}", "⚠️", "error")
+        with col_dash5:
+            render_professional_card("Critical/High Threats", f"{critical_high_threats}", "🔥", "error")
+        with col_dash6:
+            # Example: calculate average risk score
+            if total_threats > 0:
+                avg_risk = sum(t.risk_score for t in st.session_state.threats) / total_threats
+                render_professional_card("Average Risk Score", f"{avg_risk:.2f}", "📈", "success")
+            else:
+                render_professional_card("Average Risk Score", "N/A", "📈", "success")
+
+        st.markdown("---")
+        st.subheader("Threats by Severity")
+        if st.session_state.threats:
+            severity_counts = pd.DataFrame([t.severity.value for t in st.session_state.threats], columns=['Severity']).value_counts().reset_index(name='Count')
+            severity_order = [s.value for s in ThreatSeverity] # Maintain order
+            severity_counts['Severity'] = pd.Categorical(severity_counts['Severity'], categories=severity_order, ordered=True)
+            severity_counts = severity_counts.sort_values('Severity')
+
+            fig_pie = px.pie(severity_counts, values='Count', names='Severity', title='Threats by Severity',
+                             color='Severity',
+                             color_discrete_map={
+                                 ThreatSeverity.CRITICAL.value: '#d62728', # Red
+                                 ThreatSeverity.HIGH.value: '#ff7f0e',    # Orange
+                                 ThreatSeverity.MEDIUM.value: '#ff9800',  # Amber
+                                 ThreatSeverity.LOW.value: '#2ca02c',     # Green
+                                 ThreatSeverity.INFO.value: '#17a2b8'     # Cyan
+                             })
+            st.plotly_chart(fig_pie, use_container_width=True)
+        else:
+            st.info("Add some threats to see this chart!")
+
+    elif menu == "🏗️ Components":
+        render_component_form()
+        st.markdown("---")
+        render_component_table()
+
+    elif menu == "🔄 Data Flows":
+        render_data_flow_form()
+        st.markdown("---")
+        st.subheader("📋 Data Flow Inventory")
+        if st.session_state.data_flows:
+            data_flow_data = []
+            for flow in st.session_state.data_flows:
+                data_flow_data.append({
+                    "ID": flow.id,
+                    "Source": flow.source,
+                    "Target": flow.target,
+                    "Data Type": flow.data_type,
+                    "Protocol": flow.protocol,
+                    "Port": flow.port if flow.port else "N/A",
+                    "Encrypted": "Yes" if flow.encryption else "No",
+                    "Auth Required": "Yes" if flow.authentication_required else "No",
+                    "Data Classification": flow.data_classification,
+                    "Crosses Trust Boundary": "Yes" if flow.crosses_trust_boundary else "No",
+                    "Boundary Crossed": flow.trust_boundary_crossed if flow.trust_boundary_crossed else "N/A",
+                    "Description": flow.description
+                })
+            df_flows = pd.DataFrame(data_flow_data)
+            st.dataframe(df_flows, use_container_width=True, hide_index=True)
+            
+            # Data Flow management actions (similar to components)
+            st.markdown("---")
+            st.subheader("Data Flow Management Actions")
+            col_flow_del, col_flow_edit = st.columns(2)
+
+            with col_flow_del:
+                flow_to_delete_id = st.selectbox(
+                    "Select Data Flow to Delete",
+                    [""] + [f.id for f in st.session_state.data_flows],
+                    format_func=lambda x: next((f"{fl.source} -> {fl.target} (ID: {fl.id})" for fl in st.session_state.data_flows if fl.id == x), x),
+                    key="delete_flow_select"
+                )
+                if st.button("🗑️ Delete Selected Data Flow", type="secondary", disabled=flow_to_delete_id == ""):
+                    if flow_to_delete_id:
+                        st.session_state.data_flows = [f for f in st.session_state.data_flows if f.id != flow_to_delete_id]
+                        st.success("✅ Data flow deleted.")
+                        st.rerun()
+            with col_flow_edit:
+                flow_to_edit_id = st.selectbox(
+                    "Select Data Flow to Edit",
+                    [""] + [f.id for f in st.session_state.data_flows],
+                    format_func=lambda x: next((f"{fl.source} -> {fl.target} (ID: {fl.id})" for fl in st.session_state.data_flows if fl.id == x), x),
+                    key="edit_flow_select"
+                )
+                if flow_to_edit_id:
+                    selected_flow = next((f for f in st.session_state.data_flows if f.id == flow_to_edit_id), None)
+                    if selected_flow:
+                        with st.expander(f"Edit Data Flow: {selected_flow.source} -> {selected_flow.target}"):
+                            edit_data_flow_form(selected_flow)
+        else:
+            st.info("No data flows added yet.")
+
+    elif menu == "🔐 Trust Boundaries":
+        render_trust_boundary_form()
+        st.markdown("---")
+        st.subheader("Summary of Trust Boundaries")
+        if st.session_state.trust_boundaries:
+            for boundary in st.session_state.trust_boundaries:
+                components_list = ", ".join(boundary.components) if boundary.components else "None"
+                controls_list = ", ".join(boundary.controls) if boundary.controls else "None"
+                compliance_list = ", ".join(boundary.compliance_requirements) if boundary.compliance_requirements else "None"
+                
+                content = f"""
+                <p><b>Type:</b> {boundary.boundary_type}</p>
+                <p><b>Description:</b> {boundary.description}</p>
+                <p><b>Components:</b> {components_list}</p>
+                <p><b>Controls:</b> {controls_list}</p>
+                <p><b>Compliance:</b> {compliance_list}</p>
+                """
+                render_professional_card(
+                    f"{boundary.name}",
+                    content,
+                    icon="🔒",
+                    color="success" if boundary.security_level == SecurityLevel.HIGH or boundary.security_level == SecurityLevel.CRITICAL else "warning"
+                )
+        else:
+            st.info("No trust boundaries defined yet.")
+
+    elif menu == "🚨 Threats":
+        render_threat_management()
+
+    elif menu == "🎨 Architecture Diagram":
+        render_enhanced_architecture_diagram()
+
+    elif menu == "⬆️ Import/Export":
+        st.markdown("---")
+        load_project()
+        st.markdown("---")
+        save_project()
+        st.markdown("---")
+        st.subheader("Generate Report")
+        st.info("This feature would generate a comprehensive PDF/DocX report including diagrams, component inventory, and threat details.")
+        if st.button("Generate Comprehensive Report"):
+            st.write("Generating report... (Feature Under Development)")
+            # In a real app, this would trigger a backend process to generate the report
+
+def edit_data_flow_form(flow: DataFlow):
+    """Renders a form to edit an existing data flow."""
+    current_component_names = [c.name for c in st.session_state.components]
+    with st.form(f"edit_flow_form_{flow.id}"):
+        edited_source = st.selectbox("Source Component*", current_component_names, index=current_component_names.index(flow.source), key=f"edit_f_source_{flow.id}")
+        edited_target = st.selectbox("Target Component*", current_component_names, index=current_component_names.index(flow.target), key=f"edit_f_target_{flow.id}")
+        edited_data_type = st.text_input("Data Type*", flow.data_type, key=f"edit_f_data_type_{flow.id}")
+        edited_protocol = st.selectbox("Protocol*", ["HTTPS", "HTTP", "TLS", "TCP", "UDP", "WebSocket", "gRPC"], index=["HTTPS", "HTTP", "TLS", "TCP", "UDP", "WebSocket", "gRPC"].index(flow.protocol), key=f"edit_f_protocol_{flow.id}")
+        edited_port = st.number_input("Port", min_value=1, max_value=65535, value=flow.port or 443, key=f"edit_f_port_{flow.id}")
+        edited_data_classification = st.selectbox("Data Classification", ["Public", "Internal", "Confidential", "Restricted"], index=["Public", "Internal", "Confidential", "Restricted"].index(flow.data_classification), key=f"edit_f_data_class_{flow.id}")
+        edited_encryption = st.checkbox("Encrypted in Transit", value=flow.encryption, key=f"edit_f_encrypt_{flow.id}")
+        edited_authentication = st.checkbox("Authentication Required", value=flow.authentication_required, key=f"edit_f_auth_{flow.id}")
+        edited_description = st.text_area("Description", flow.description, key=f"edit_f_desc_{flow.id}")
+
+        update_submitted = st.form_submit_button("💾 Update Data Flow", type="primary")
+
+        if update_submitted:
+            if edited_source == edited_target:
+                st.error("❌ Source and target cannot be the same component.")
+                return
+
+            flow.source = edited_source
+            flow.target = edited_target
+            flow.data_type = edited_data_type
+            flow.protocol = edited_protocol
+            flow.port = edited_port
+            flow.data_classification = edited_data_classification
+            flow.encryption = edited_encryption
+            flow.authentication_required = edited_authentication
+            flow.description = edited_description
+            flow.updated_at = datetime.now()
+
+            # Re-analyze boundary crossings after updating a flow
+            st.session_state.data_flows = analyze_trust_boundary_crossings(
+                st.session_state.data_flows, st.session_state.trust_boundaries
+            )
+            st.success(f"✅ Data flow from '{edited_source}' to '{edited_target}' updated successfully!")
+            st.rerun()
+
+if __name__ == "__main__":
+    main()
