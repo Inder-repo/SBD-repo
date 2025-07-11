@@ -447,7 +447,7 @@ DEFAULT_MITIGATIONS = {
         {'type': 'Preventive', 'control': 'Implement strong data integrity checks for all transactions'},
         {'type': 'Preventive', 'control': 'Use cryptographic signatures for transaction data'},
         {'type': 'Detective', 'control': 'Reconcile transactions regularly and detect discrepancies'}
-    '},
+    ], # Removed the extra '}' here
     'Order Repudiation': [
         {'type': 'Preventive', 'control': 'Implement comprehensive audit logging for all order actions'},
         {'type': 'Preventive', 'control': 'Send email/SMS confirmations for critical order states'},
