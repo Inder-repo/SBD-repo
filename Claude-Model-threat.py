@@ -666,8 +666,12 @@ def render_trust_boundary_form():
                         key=f"comps_{boundary.id}"
                     )
 
-                    edited_controls = st.multiselect("Security Controls", available_controls, default=boundary.controls, key=f"controls_{boundary.id}")
-                    edited_compliance = st.multiselect("Compliance Requirements", compliance_options, default=boundary.compliance_requirements, key=f"compliance_{boundary.id}")
+                    # Filter default values for controls and compliance
+                    filtered_controls = [c for c in boundary.controls if c in available_controls]
+                    edited_controls = st.multiselect("Security Controls", available_controls, default=filtered_controls, key=f"controls_{boundary.id}")
+                    
+                    filtered_compliance = [c for c in boundary.compliance_requirements if c in compliance_options]
+                    edited_compliance = st.multiselect("Compliance Requirements", compliance_options, default=filtered_compliance, key=f"compliance_{boundary.id}")
 
                     update_button = st.form_submit_button("💾 Update Boundary", type="secondary")
                     delete_button = st.form_submit_button("🗑️ Delete Boundary", help="This will permanently delete the boundary.", on_click=lambda b_id=boundary.id: delete_trust_boundary(b_id), key=f"delete_{boundary.id}")
