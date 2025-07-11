@@ -663,7 +663,10 @@ if 'firebase_initialized' not in st.session_state:
     st.session_state.user_id = None
     st.session_state.app_id = None # Store app_id for Firestore paths
 
-    # This block will run only once to initialize Firebase
+    # Ensure these are always initialized to prevent AttributeError
+    st.session_state.firebase_config_json = "{}"
+    st.session_state.initial_auth_token = None
+
     try:
         # Access global variables provided by the Canvas environment using Pythonic checks
         app_id = globals().get('__app_id', 'default-app-id')
@@ -1666,6 +1669,108 @@ def render_threat_model_dashboard():
                 selectedNode = null;
                 drawDiagram();
             }});
+
+            // Listen for messages from Streamlit to trigger save/load/delete
+            window.addEventListener('message', (event) => {{
+                // Ensure the message is from our Streamlit parent and contains relevant data
+                if (event.source === window.parent && event.data && event.data.type === 'streamlit_command') {{
+                    const command = event.data.payload;
+                    if (command.save) {{
+                        saveModelToFirestoreJS(command.save.model_name, command.save.architecture, command.save.threat_model)
+                            .then(success => {{
+                                if (success) {{
+                                    sendJsCommandToStreamlit('model_saved', {{ model_name: command.save.model_name }});
+                                }}
+                            }});
+                    }} else if (command.load) {{
+                        loadModelsFromFirestoreJS()
+                            .then(models => {{
+                                sendJsCommandToStreamlit('load_models_response', {{ models: models }});
+                            }});
+                    }} else if (command.delete) {{
+                        deleteModelFromFirestoreJS(command.delete)
+                            .then(success => {{
+                                if (success) {{
+                                    sendJsCommandToStreamlit('model_deleted', {{ model_id: command.delete }});
+                                }}
+                            }});
+                    }}
+                }}
+            }});
+
+            // Function to send commands back to Streamlit (e.g., confirmation of save/delete)
+            function sendJsCommandToStreamlit(action, payload) {{
+                const outputElement = window.parent.document.querySelector('textarea[data-testid="stTextArea-js-commands"]');
+                if (outputElement) {{
+                    outputElement.value = JSON.stringify({{ action: action, ...payload }});
+                    outputElement.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    outputElement.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }} else {{
+                    console.error("Streamlit JS commands textarea element not found.");
+                }}
+
+                // Also send loaded models data specifically to the load_models_data_transfer textarea
+                if (action === 'load_models_response') {{
+                    const loadOutputElement = window.parent.document.querySelector('textarea[data-testid="stTextArea-load-models"]');
+                    if (loadOutputElement) {{
+                        loadOutputElement.value = JSON.stringify(payload.models);
+                        loadOutputElement.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                        loadOutputElement.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                    }}
+                }}
+            }}
+
+            // Listen for requests from Streamlit to trigger JS functions (e.g., for saving/loading)
+            const jsRequestsInput = window.parent.document.querySelector('textarea[data-testid="stTextArea-js-requests"]');
+            if (jsRequestsInput) {{
+                const observer = new MutationObserver((mutationsList) => {{
+                    for (const mutation of mutationsList) {{
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'value') {{
+                            try {{
+                                const requests = JSON.parse(jsRequestsInput.value);
+                                if (requests.save) {{
+                                    saveModelToFirestoreJS(requests.save.model_name, requests.save.architecture, requests.save.threat_model)
+                                        .then(success => {{
+                                            if (success) {{
+                                                sendJsCommandToStreamlit('model_saved', {{ model_name: requests.save.model_name }});
+                                            }}
+                                        }});
+                                    // Clear the request after processing
+                                    jsRequestsInput.value = JSON.stringify({{}});
+                                    jsRequestsInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                    jsRequestsInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                                }})
+                                if (requests.load) {{
+                                    loadModelsFromFirestoreJS()
+                                        .then(models => {{
+                                            sendJsCommandToStreamlit('load_models_response', {{ models: models }});
+                                        }});
+                                    // Clear the request after processing
+                                    jsRequestsInput.value = JSON.stringify({{}});
+                                    jsRequestsInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                    jsRequestsInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                                }})
+                                if (requests.delete) {{
+                                    deleteModelFromFirestoreJS(requests.delete)
+                                        .then(success => {{
+                                            if (success) {{
+                                                sendJsCommandToStreamlit('model_deleted', {{ model_id: requests.delete }});
+                                            }}
+                                        }});
+                                    // Clear the request after processing
+                                    jsRequestsInput.value = JSON.stringify({{}});
+                                    jsRequestsInput.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                                    jsRequestsInput.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                                }})
+                            }} catch (e) {{
+                                console.error("Error parsing JS requests from Streamlit:", e);
+                            }}
+                        }}
+                    }}
+                }});
+                observer.observe(jsRequestsInput, {{ attributes: true }});
+            }}
+
 
         </script>
     </body>
