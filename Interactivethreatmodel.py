@@ -447,7 +447,7 @@ DEFAULT_MITIGATIONS = {
         {'type': 'Preventive', 'control': 'Implement strong data integrity checks for all transactions'},
         {'type': 'Preventive', 'control': 'Use cryptographic signatures for transaction data'},
         {'type': 'Detective', 'control': 'Reconcile transactions regularly and detect discrepancies'}
-    ], # Removed the extra '}' here
+    ],
     'Order Repudiation': [
         {'type': 'Preventive', 'control': 'Implement comprehensive audit logging for all order actions'},
         {'type': 'Preventive', 'control': 'Send email/SMS confirmations for critical order states'},
@@ -1379,8 +1379,25 @@ def render_threat_model_dashboard():
     st.components.v1.html(diagram_html, height=600, scrolling=False)
 
     # Hidden text area to receive data from JavaScript
-    # Streamlit will re-run the script when this value changes
-    architecture_data_json = st.text_area("architecture_data_transfer", value=json.dumps(st.session_state.architecture), height=68, key="streamlit_output_data", help="Do not modify this field directly.", disabled=True)
+    # Removed disabled=True and added CSS to hide it
+    st.markdown(
+        """
+        <style>
+        .stTextArea[data-testid="stTextArea"] {
+            display: none;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    architecture_data_json = st.text_area(
+        "architecture_data_transfer",
+        value=json.dumps(st.session_state.architecture),
+        height=68,
+        key="streamlit_output_data",
+        help="Do not modify this field directly.",
+        # disabled=True  <-- Removed this line
+    )
 
     # Process data received from JavaScript
     if architecture_data_json:
