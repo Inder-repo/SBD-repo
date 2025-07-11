@@ -374,15 +374,9 @@ COMMON_TRUST_BOUNDARIES = [
 # Initial data structure for the threat model (default or loaded from session state)
 def get_initial_threat_data(sample_name="Banking Application"):
     if sample_name == "New Empty Model":
-        # For a new empty model, initialize with common boundaries but no threats
-        initial_threat_model = {}
-        for boundary in COMMON_TRUST_BOUNDARIES:
-            initial_threat_model[boundary] = {
-                'description': f"Common trust boundary: {boundary}",
-                'components': [],
-                'threats': []
-            }
-        return initial_threat_model
+        # For a new empty model, initialize with an empty threat model
+        # Common boundaries will be available in the dropdown but not pre-drawn or in threat_model
+        return {}
     
     banking_threat_data = {
         # --- Banking Application Threats ---
@@ -615,13 +609,17 @@ def render_threat_model_dashboard():
     st.subheader("🏗️ 1. Define System Architecture")
     st.write("Interact with the diagram below to add components and define data flows. Changes will automatically update your threat model.")
 
-    # Combine existing trust boundaries with common ones, ensuring uniqueness and sorting
-    all_current_boundaries = set(st.session_state.threat_model.keys())
-    all_boundaries_for_js = sorted(list(all_current_boundaries.union(COMMON_TRUST_BOUNDARIES)))
+    # Combine existing trust boundaries (from threat_model) with common ones, ensuring uniqueness and sorting
+    # This list will be used to populate the dropdown in the JS modal
+    all_current_boundaries_in_model = set(st.session_state.threat_model.keys())
+    all_boundaries_for_js_dropdown = sorted(list(all_current_boundaries_in_model.union(COMMON_TRUST_BOUNDARIES)))
+
+    # For drawing, we only care about boundaries that are actually in the threat_model (i.e., used in connections or from samples)
+    active_boundaries_for_drawing = list(st.session_state.threat_model.keys())
 
     # Debugging: Print current threat model keys to Streamlit UI
     if st.session_state.current_sample == "New Empty Model":
-        st.info(f"Current Trust Boundaries in Python session state: {list(st.session_state.threat_model.keys())}")
+        st.info(f"Current Trust Boundaries in Python session state (for drawing): {list(st.session_state.threat_model.keys())}")
 
 
     diagram_html = f"""
@@ -879,8 +877,11 @@ def render_threat_model_dashboard():
             let nodes = {json.dumps(st.session_state.architecture['components'])};
             let connections = {json.dumps(st.session_state.architecture['connections'])};
             let selectedNode = null;
-            // Pass the combined and sorted threat boundary names to JavaScript
-            let threatBoundaryNames = {json.dumps(all_boundaries_for_js)};
+            // Pass the combined and sorted threat boundary names for the dropdown
+            let threatBoundaryNamesForDropdown = {json.dumps(all_boundaries_for_js_dropdown)};
+            // Pass the active boundaries for drawing
+            let activeBoundariesForDrawing = {json.dumps(active_boundaries_for_drawing)};
+
 
             // Function to send data back to Streamlit
             function sendDataToStreamlit() {{
@@ -993,32 +994,41 @@ def render_threat_model_dashboard():
                 // This is a simplified representation of trust boundaries for teaching.
                 // In a real tool, this would be more complex, potentially using bounding boxes
                 // of associated components or user-defined areas.
-                const boundaries = {{
+                const predefinedVisualBoundaries = {{
                     'Internet -> DMZ': {{x: 50, y: 20, width: 700, height: 250, label: 'Internet / DMZ Boundary'}},
                     'DMZ -> Internal App Tier': {{x: 450, y: 20, width: 700, height: 300, label: 'DMZ / Internal App Boundary'}},
                     'Internal App Tier -> Database': {{x: 750, y: 50, width: 300, height: 200, label: 'App / DB Boundary'}},
                     'Customer-Web App Boundary': {{x: 50, y: 350, width: 400, height: 200, label: 'Customer / Web App Boundary'}},
                     'Web App-Payment Gateway Boundary': {{x: 400, y: 350, width: 300, height: 200, label: 'Web App / Payment Gateway Boundary'}},
                     'Web App-Database Boundary': {{x: 200, y: 400, width: 300, height: 200, label: 'Web App / Order DB Boundary'}},
-                    'Web App-Shipping Service Boundary': {{x: 400, y: 400, width: 300, height: 200, label: 'Web App / Shipping Service Boundary'}}
+                    'Web App-Shipping Service Boundary': {{x: 400, y: 400, width: 300, height: 200, label: 'Web App / Shipping Service Boundary'}},
+                    'User -> Application': {{x: 50, y: 50, width: 300, height: 150, label: 'User / App Boundary'}},
+                    'Application -> API Gateway': {{x: 350, y: 50, width: 300, height: 150, label: 'App / API Gateway Boundary'}},
+                    'API Gateway -> Microservice': {{x: 650, y: 50, width: 300, height: 150, label: 'API Gateway / Microservice Boundary'}},
+                    'Microservice -> Database': {{x: 350, y: 250, width: 300, height: 150, label: 'Microservice / DB Boundary'}},
+                    'On-Premise -> Cloud': {{x: 50, y: 400, width: 900, height: 150, label: 'On-Premise / Cloud Boundary'}},
+                    'External Partner Network': {{x: 700, y: 350, width: 250, height: 150, label: 'External Partner Network Boundary'}}
                 }};
 
-                Object.keys(boundaries).forEach(key => {{
-                    const boundary = boundaries[key];
-                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                    rect.setAttribute('x', boundary.x);
-                    rect.setAttribute('y', boundary.y);
-                    rect.setAttribute('width', boundary.width);
-                    rect.setAttribute('height', boundary.height);
-                    rect.setAttribute('class', 'trust-boundary-rect');
-                    svg.appendChild(rect);
+                // Only draw a predefined visual boundary if it exists in the activeBoundariesForDrawing list
+                activeBoundariesForDrawing.forEach(boundaryName => {{
+                    if (predefinedVisualBoundaries[boundaryName]) {{
+                        const boundary = predefinedVisualBoundaries[boundaryName];
+                        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        rect.setAttribute('x', boundary.x);
+                        rect.setAttribute('y', boundary.y);
+                        rect.setAttribute('width', boundary.width);
+                        rect.setAttribute('height', boundary.height);
+                        rect.setAttribute('class', 'trust-boundary-rect');
+                        svg.appendChild(rect);
 
-                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-                    text.setAttribute('x', boundary.x + 10);
-                    text.setAttribute('y', boundary.y + 20);
-                    text.setAttribute('class', 'trust-boundary-label');
-                    text.textContent = boundary.label;
-                    svg.appendChild(text);
+                        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        text.setAttribute('x', boundary.x + 10);
+                        text.setAttribute('y', boundary.y + 20);
+                        text.setAttribute('class', 'trust-boundary-label');
+                        text.textContent = boundary.label;
+                        svg.appendChild(text);
+                    }}
                 }});
             }}
 
@@ -1120,15 +1130,14 @@ def render_threat_model_dashboard():
                 const trustBoundarySelect = document.getElementById('connTrustBoundary');
                 trustBoundarySelect.innerHTML = ''; // Clear previous options
                 
-                // Add default option
+                // Add default "Select" option
                 const defaultOption = document.createElement('option');
                 defaultOption.value = "";
                 defaultOption.textContent = "-- Select or Type New --";
                 trustBoundarySelect.appendChild(defaultOption);
 
-                // Add existing boundaries from the Python session state
-                // This 'threatBoundaryNames' now includes both sample-specific and common boundaries
-                threatBoundaryNames.forEach(boundary => {{
+                // Add all available boundaries (common + existing in model) to the dropdown
+                threatBoundaryNamesForDropdown.forEach(boundary => {{
                     const option = document.createElement('option');
                     option.value = boundary;
                     option.textContent = boundary;
@@ -1156,7 +1165,7 @@ def render_threat_model_dashboard():
                 }};
 
                 // Debugging: Log the array of boundaries being used to populate the dropdown
-                console.log("Trust Boundaries available in JS for dropdown:", threatBoundaryNames);
+                console.log("Trust Boundaries available in JS for dropdown:", threatBoundaryNamesForDropdown);
 
                 openModal('addConnectionModal');
             }});
