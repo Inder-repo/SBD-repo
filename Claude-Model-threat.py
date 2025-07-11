@@ -91,11 +91,11 @@ class Threat:
     id: str
     name: str
     description: str
-    affected_components: List[str] # List of component names affected
-    affected_data_flows: List[str] = field(default_factory=list) # List of data flow IDs affected
     stride_category: StrideCategory
     severity: ThreatSeverity
     mitigation: str
+    affected_components: List[str] = field(default_factory=list) # Now has a default factory
+    affected_data_flows: List[str] = field(default_factory=list)
     likelihood: str = "Medium"
     impact: str = "Medium"
     risk_score: float = 0.0
@@ -170,57 +170,57 @@ ENHANCED_THREAT_PATTERNS = {
         Threat(
             id="WEB001", name="SQL Injection",
             description="Malicious SQL code injection through user inputs affecting database integrity.",
-            affected_components=[], affected_data_flows=[], stride_category=StrideCategory.TAMPERING,
+            stride_category=StrideCategory.TAMPERING,
             severity=ThreatSeverity.HIGH, mitigation="Implement parameterized queries, input validation, and stored procedures.",
-            likelihood="Medium", impact="High", risk_score=0.0
+            affected_components=[], affected_data_flows=[], likelihood="Medium", impact="High", risk_score=0.0
         ),
         Threat(
             id="WEB002", name="Cross-Site Scripting (XSS)",
             description="Malicious scripts executed in user browsers compromising client-side security.",
-            affected_components=[], affected_data_flows=[], stride_category=StrideCategory.TAMPERING,
+            stride_category=StrideCategory.TAMPERING,
             severity=ThreatSeverity.MEDIUM, mitigation="Implement output encoding, CSP headers, and input sanitization.",
-            likelihood="High", impact="Medium", risk_score=0.0
+            affected_components=[], affected_data_flows=[], likelihood="High", impact="Medium", risk_score=0.0
         ),
         Threat(
             id="WEB003", name="Authentication Bypass",
             description="Unauthorized access to protected resources through authentication flaws.",
-            affected_components=[], affected_data_flows=[], stride_category=StrideCategory.SPOOFING,
+            stride_category=StrideCategory.SPOOFING,
             severity=ThreatSeverity.HIGH, mitigation="Implement MFA, session management, and strong password policies.",
-            likelihood="Low", impact="High", risk_score=0.0
+            affected_components=[], affected_data_flows=[], likelihood="Low", impact="High", risk_score=0.0
         )
     ],
     "DataFlow_Insecure_Sensitive": [
         Threat(
             id="DF001", name="Data Eavesdropping (Insecure Transit)",
             description="Sensitive data transmitted over unencrypted or weak protocols, allowing interception.",
-            affected_components=[], affected_data_flows=[], stride_category=StrideCategory.INFORMATION_DISCLOSURE,
+            stride_category=StrideCategory.INFORMATION_DISCLOSURE,
             severity=ThreatSeverity.CRITICAL, mitigation="Enforce strong encryption (TLS 1.2+) for all sensitive data in transit.",
-            likelihood="High", impact="Critical", risk_score=0.0
+            affected_components=[], affected_data_flows=[], likelihood="High", impact="Critical", risk_score=0.0
         ),
         Threat(
             id="DF002", name="Data Tampering (Insecure Transit)",
             description="Data integrity compromised due to lack of protection during transmission.",
-            affected_components=[], affected_data_flows=[], stride_category=StrideCategory.TAMPERING,
+            stride_category=StrideCategory.TAMPERING,
             severity=ThreatSeverity.HIGH, mitigation="Implement message authentication codes (MACs) or digital signatures.",
-            likelihood="Medium", impact="High", risk_score=0.0
+            affected_components=[], affected_data_flows=[], likelihood="Medium", impact="High", risk_score=0.0
         )
     ],
     "TrustBoundary_Crossing_Privilege_Escalation": [
         Threat(
             id="TB001", name="Trust Boundary Violation (Privilege Escalation)",
             description="Unauthorized privilege escalation when data or control flows cross trust boundaries without proper validation or least privilege.",
-            affected_components=[], affected_data_flows=[], stride_category=StrideCategory.ELEVATION_OF_PRIVILEGE,
+            stride_category=StrideCategory.ELEVATION_OF_PRIVILEGE,
             severity=ThreatSeverity.CRITICAL, mitigation="Implement strict input validation, output encoding, and enforce least privilege at boundary crossings.",
-            likelihood="Medium", impact="Critical", risk_score=0.0
+            affected_components=[], affected_data_flows=[], likelihood="Medium", impact="Critical", risk_score=0.0
         )
     ],
     "TrustBoundary_Crossing_Info_Disclosure": [
         Threat(
             id="TB002", name="Trust Boundary Violation (Information Disclosure)",
             description="Sensitive information leakage across trust boundaries due to insufficient filtering or controls.",
-            affected_components=[], affected_data_flows=[], stride_category=StrideCategory.INFORMATION_DISCLOSURE,
+            stride_category=StrideCategory.INFORMATION_DISCLOSURE,
             severity=ThreatSeverity.HIGH, mitigation="Implement data loss prevention (DLP), strict data filtering, and access controls at boundary crossings.",
-            likelihood="Medium", impact="High", risk_score=0.0
+            affected_components=[], affected_data_flows=[], likelihood="Medium", impact="High", risk_score=0.0
         )
     ]
 }
@@ -1129,11 +1129,11 @@ def perform_threat_analysis(components: List[Component], data_flows: List[DataFl
                         id=generate_id("THRT_"),
                         name=threat_template.name,
                         description=threat_template.description.replace("database", "the database connected to " + comp.name),
-                        affected_components=[comp.name],
-                        affected_data_flows=[],
                         stride_category=threat_template.stride_category,
                         severity=threat_template.severity,
                         mitigation=threat_template.mitigation,
+                        affected_components=[comp.name], # Now passed as keyword arg due to default factory
+                        affected_data_flows=[],
                         likelihood=threat_template.likelihood,
                         impact=threat_template.impact,
                         risk_score=calculate_risk_score(threat_template.likelihood, threat_template.impact),
@@ -1153,9 +1153,9 @@ def perform_threat_analysis(components: List[Component], data_flows: List[DataFl
                     st.session_state.threats.append(Threat(
                         id=generate_id("THRT_"), name=threat_name,
                         description=f"Sensitive data in {comp.name} is not encrypted at rest.",
-                        affected_components=[comp.name], affected_data_flows=[], stride_category=StrideCategory.INFORMATION_DISCLOSURE,
+                        stride_category=StrideCategory.INFORMATION_DISCLOSURE,
                         severity=ThreatSeverity.CRITICAL, mitigation="Implement database encryption at rest (e.g., TDE, disk encryption).",
-                        likelihood="Medium", impact="Critical", risk_score=calculate_risk_score("Medium", "Critical")
+                        affected_components=[comp.name], affected_data_flows=[], likelihood="Medium", impact="Critical", risk_score=calculate_risk_score("Medium", "Critical")
                     ))
                     new_threats_count += 1
 
@@ -1171,11 +1171,11 @@ def perform_threat_analysis(components: List[Component], data_flows: List[DataFl
                         id=generate_id("THRT_"),
                         name=threat_template.name,
                         description=threat_template.description.replace("Sensitive data", f"Sensitive data ({flow.data_type})"),
-                        affected_components=[flow.source, flow.target], # Affects both ends of the flow
-                        affected_data_flows=[flow.id],
                         stride_category=threat_template.stride_category,
                         severity=threat_template.severity,
                         mitigation=threat_template.mitigation,
+                        affected_components=[flow.source, flow.target], # Affects both ends of the flow
+                        affected_data_flows=[flow.id],
                         likelihood=threat_template.likelihood,
                         impact=threat_template.impact,
                         risk_score=calculate_risk_score(threat_template.likelihood, threat_template.impact),
@@ -1192,10 +1192,9 @@ def perform_threat_analysis(components: List[Component], data_flows: List[DataFl
                 st.session_state.threats.append(Threat(
                     id=generate_id("THRT_"), name=threat_name,
                     description=f"Data flow '{flow.data_type}' from {flow.source} to {flow.target} crosses trust boundary ({flow.trust_boundary_crossed}) without authentication.",
-                    affected_components=[flow.source, flow.target], affected_data_flows=[flow.id],
-                    stride_category=StrideCategory.SPOOFING, severity=ThreatSeverity.HIGH,
-                    mitigation="Implement strong authentication mechanisms at trust boundary crossings (e.g., mutual TLS, API keys).",
-                    likelihood="High", impact="High", risk_score=calculate_risk_score("High", "High")
+                    stride_category=StrideCategory.SPOOFING,
+                    severity=ThreatSeverity.HIGH, mitigation="Implement strong authentication mechanisms at trust boundary crossings (e.g., mutual TLS, API keys).",
+                    affected_components=[flow.source, flow.target], affected_data_flows=[flow.id], likelihood="High", impact="High", risk_score=calculate_risk_score("High", "High")
                 ))
                 new_threats_count += 1
 
@@ -1215,11 +1214,11 @@ def perform_threat_analysis(components: List[Component], data_flows: List[DataFl
                     st.session_state.threats.append(Threat(
                         id=generate_id("THRT_"), name=threat_template.name,
                         description=f"{threat_template.description} (Context: {boundary.name} boundary).",
-                        affected_components=boundary.components, # Affects components within the boundary
-                        affected_data_flows=[f.id for f in flows_crossing_this_boundary],
                         stride_category=threat_template.stride_category,
                         severity=threat_template.severity,
                         mitigation=threat_template.mitigation,
+                        affected_components=boundary.components, # Affects components within the boundary
+                        affected_data_flows=[f.id for f in flows_crossing_this_boundary],
                         likelihood=threat_template.likelihood,
                         impact=threat_template.impact,
                         risk_score=calculate_risk_score(threat_template.likelihood, threat_template.impact),
@@ -1234,11 +1233,11 @@ def perform_threat_analysis(components: List[Component], data_flows: List[DataFl
                     st.session_state.threats.append(Threat(
                         id=generate_id("THRT_"), name=threat_template.name,
                         description=f"{threat_template.description} (Context: {boundary.name} boundary).",
-                        affected_components=boundary.components,
-                        affected_data_flows=[f.id for f in flows_crossing_this_boundary],
                         stride_category=threat_template.stride_category,
                         severity=threat_template.severity,
                         mitigation=threat_template.mitigation,
+                        affected_components=boundary.components,
+                        affected_data_flows=[f.id for f in flows_crossing_this_boundary],
                         likelihood=threat_template.likelihood,
                         impact=threat_template.impact,
                         risk_score=calculate_risk_score(threat_template.likelihood, threat_template.impact),
@@ -1316,11 +1315,11 @@ def render_threat_management():
                     id=generate_id("THRT_"),
                     name=threat_name,
                     description=threat_description,
-                    affected_components=affected_comps,
-                    affected_data_flows=actual_affected_flow_ids,
                     stride_category=StrideCategory(stride_cat),
                     severity=ThreatSeverity(severity),
                     mitigation=mitigation,
+                    affected_components=affected_comps, # Now passed as keyword arg due to default factory
+                    affected_data_flows=actual_affected_flow_ids,
                     likelihood=likelihood,
                     impact=impact,
                     risk_score=calculated_risk_score,
