@@ -1008,13 +1008,18 @@ def render_threat_model_dashboard():
                     nodes: nodes,
                     connections: connections
                 }};
-                // Corrected: Use the specific data-testid for the textarea element
-                const outputElement = window.parent.document.querySelector('[data-testid="stTextArea-textarea"]');
+                // Corrected: Find the parent div with the specific key, then find the textarea inside it
+                const parentDiv = window.parent.document.querySelector('[data-st-component-key="streamlit_output_data"]');
+                let outputElement = null;
+                if (parentDiv) {{
+                    outputElement = parentDiv.querySelector('textarea[data-testid="stTextArea-textarea"]');
+                }}
+
                 if (outputElement) {{
                     outputElement.value = JSON.stringify(data);
                     outputElement.dispatchEvent(new Event('input')); // Trigger Streamlit rerun
                 }} else {{
-                    console.error("Streamlit output textarea element not found with data-testid='stTextArea-textarea'.");
+                    console.error("Streamlit output textarea element not found for key 'streamlit_output_data'.");
                 }}
             }}
 
