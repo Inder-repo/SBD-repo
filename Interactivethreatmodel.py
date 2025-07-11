@@ -10,7 +10,7 @@ import json # For passing data between Python and JavaScript
 # Page configuration
 st.set_page_config(
     page_title="Threat Model",
-    page_icon="�",
+    page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -180,7 +180,7 @@ st.markdown("""
         height: 100%;
     }
     .diagram-node-rect { /* Changed from .diagram-node */
-        cursor: pointer;
+        cursor: grab; /* Indicate draggable */
         stroke: #333;
         stroke-width: 2px;
         transition: all 0.2s ease-in-out;
@@ -646,6 +646,10 @@ if 'threat_model' not in st.session_state:
 if 'architecture' not in st.session_state:
     st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
 
+# New session state variable for controlling report visibility
+if 'show_report_sections' not in st.session_state:
+    st.session_state.show_report_sections = False
+
 
 def main():
     # Header
@@ -680,12 +684,15 @@ def main():
         # Reset data based on the newly selected sample type
         st.session_state.threat_model = get_initial_threat_data(st.session_state.current_sample)
         st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
+        # Reset report visibility when switching models
+        st.session_state.show_report_sections = False 
         st.rerun() # Rerun to load the new data
 
     # Reset button - resets the CURRENTLY loaded model (either sample or empty)
     if st.sidebar.button(f"🔄 Reset Current Model"):
         st.session_state.threat_model = get_initial_threat_data(st.session_state.current_sample)
         st.session_state.architecture = get_initial_architecture_data(st.session_state.current_sample)
+        st.session_state.show_report_sections = False # Reset report visibility on reset
         st.rerun()
         st.success(f"Current model data reset to '{st.session_state.current_sample}' defaults.")
 
@@ -697,7 +704,7 @@ def main():
 def render_threat_model_dashboard():
     # --- Architecture Definition Section ---
     st.subheader("🏗️ 1. Define System Architecture")
-    st.write("Interact with the diagram below to add components and define data flows. Changes will automatically update your threat model.")
+    st.write("Interact with the diagram below to add components and define data flows. You can also drag components to rearrange them.")
 
     # Combine existing trust boundaries (from threat_model) with common ones, ensuring uniqueness and sorting
     # This list will be used to populate the dropdown in the JS modal
@@ -706,11 +713,6 @@ def render_threat_model_dashboard():
 
     # For drawing, we only care about boundaries that are actually in the threat_model (i.e., used in connections or from samples)
     active_boundaries_for_drawing = list(st.session_state.threat_model.keys())
-
-    # Debugging: Print current threat model keys to Streamlit UI
-    if st.session_state.current_sample == "New Empty Model":
-        st.info(f"Current Trust Boundaries in Python session state (for drawing): {list(st.session_state.threat_model.keys())}")
-
 
     diagram_html = f"""
     <!DOCTYPE html>
@@ -733,7 +735,7 @@ def render_threat_model_dashboard():
                 height: 100%;
             }}
             .diagram-node-rect {{ /* Changed from .diagram-node */
-                cursor: pointer;
+                cursor: grab; /* Indicate draggable */
                 stroke: #333;
                 stroke-width: 2px;
                 transition: all 0.2s ease-in-out;
@@ -972,6 +974,12 @@ def render_threat_model_dashboard():
             // Pass the active boundaries for drawing
             let activeBoundariesForDrawing = {json.dumps(active_boundaries_for_drawing)};
 
+            let isDragging = false;
+            let activeElement = null; // The rect element being dragged
+            let activeNodeId = null; // The ID of the node object being dragged
+            let offset = {x: 0, y: 0};
+            const nodeWidth = 100;
+            const nodeHeight = 60;
 
             // Function to send data back to Streamlit
             function sendDataToStreamlit() {{
@@ -1000,10 +1008,6 @@ def render_threat_model_dashboard():
                     </defs>
                 `; // Clear and redraw
                 
-                // Define node width and height
-                const nodeWidth = 100;
-                const nodeHeight = 60;
-
                 // Draw trust boundaries first (behind other elements)
                 drawTrustBoundaries();
 
@@ -1019,18 +1023,28 @@ def render_threat_model_dashboard():
                     rect.setAttribute('class', `diagram-node-rect ${{selectedNode && selectedNode.id === node.id ? 'selected' : ''}}`);
                     rect.setAttribute('fill', getNodeColor(node.type));
                     rect.dataset.nodeId = node.id;
-                    rect.addEventListener('click', (event) => {{
-                        event.stopPropagation(); // Prevent SVG click
-                        selectNode(node.id);
-                    }});
-                    svg.appendChild(rect);
+                    svg.appendChild(rect); // Append rect first
 
                     const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
                     text.setAttribute('x', node.x);
                     text.setAttribute('y', node.y);
                     text.setAttribute('class', 'diagram-node-text');
                     text.textContent = node.name;
-                    svg.appendChild(text);
+                    text.dataset.nodeId = node.id; // Link text to node as well
+                    svg.appendChild(text); // Append text second
+
+                    // Add event listener for dragging to the rect
+                    rect.addEventListener('mousedown', (event) => {{
+                        isDragging = true;
+                        activeElement = rect;
+                        activeNodeId = node.id;
+                        offset.x = event.clientX - parseFloat(rect.getAttribute('x'));
+                        offset.y = event.clientY - parseFloat(rect.getAttribute('y'));
+                        // Bring to front
+                        svg.appendChild(rect);
+                        svg.appendChild(text);
+                        selectNode(node.id); // Select the node when dragging starts
+                    }});
                 }});
 
                 // Draw connections
@@ -1305,6 +1319,45 @@ def render_threat_model_dashboard():
                 }}
             }});
 
+            // Dragging event listeners for the SVG container
+            svg.addEventListener('mousemove', (event) => {{
+                if (!isDragging) return;
+
+                event.preventDefault(); // Prevent text selection during drag
+
+                const newX = event.clientX - offset.x;
+                const newY = event.clientY - offset.y;
+
+                activeElement.setAttribute('x', newX);
+                activeElement.setAttribute('y', newY);
+
+                // Update the corresponding node object in the 'nodes' array
+                const nodeToUpdate = nodes.find(n => n.id === activeNodeId);
+                if (nodeToUpdate) {{
+                    nodeToUpdate.x = newX + nodeWidth / 2;
+                    nodeToUpdate.y = newY + nodeHeight / 2;
+                }}
+                
+                // Also move the text element
+                const textElement = svg.querySelector(`text[data-node-id="${{activeNodeId}}"]`);
+                if (textElement) {{
+                    textElement.setAttribute('x', newX + nodeWidth / 2);
+                    textElement.setAttribute('y', newY + nodeHeight / 2);
+                }}
+
+                // Redraw connections to reflect the new node position
+                drawDiagram(); // A full redraw is simpler for now, optimize if performance is an issue
+            }});
+
+            svg.addEventListener('mouseup', () => {{
+                if (isDragging) {{
+                    isDragging = false;
+                    activeElement = null;
+                    activeNodeId = null;
+                    sendDataToStreamlit(); // Send updated positions to Streamlit
+                }}
+            }});
+
             // Initial draw
             drawDiagram();
 
@@ -1345,376 +1398,384 @@ def render_threat_model_dashboard():
                             'threats': []
                         }
                         st.sidebar.success(f"New Trust Boundary '{trust_boundary}' auto-added!") # Use sidebar for less intrusive message
-                st.rerun() # Rerun to update the Python state and subsequent sections
+                # Do not rerun here directly after architecture update, let the button trigger it
+                # st.rerun() 
         except json.JSONDecodeError:
             st.error("Error decoding architecture data from diagram.")
     
     st.markdown("---")
 
-    # --- STRIDE Methodology Overview ---
-    st.subheader("📖 STRIDE Methodology Overview")
-    st.markdown("""
-    The STRIDE threat model is a widely used framework for identifying and classifying security threats. Each letter in STRIDE represents a category of threat:
+    # Button to trigger report generation
+    if st.button("Generate Threat Model Report", key="generate_report_btn"):
+        st.session_state.show_report_sections = True
+        st.rerun() # Rerun to display the sections
 
-    * **S - Spoofing:** Impersonating something or someone else. (e.g., an attacker pretending to be a legitimate user or server).
-    * **T - Tampering:** Modifying data or code. (e.g., an attacker altering data in transit or at rest).
-    * **R - Repudiation:** Denying an action without the ability to be disproven. (e.g., a user denying they performed a transaction).
-    * **I - Information Disclosure:** Exposing information to unauthorized individuals. (e.g., sensitive data leaks, improper error messages).
-    * **D - Denial of Service:** Preventing legitimate users from accessing a service. (e.g., a server being overwhelmed by requests).
-    * **E - Elevation of Privilege:** Gaining unauthorized higher-level access. (e.g., a regular user gaining administrative rights).
-    """)
-    st.markdown("---")
+    if st.session_state.show_report_sections:
+        # --- STRIDE Methodology Overview ---
+        st.subheader("📖 STRIDE Methodology Overview")
+        st.markdown("""
+        The STRIDE threat model is a widely used framework for identifying and classifying security threats. Each letter in STRIDE represents a category of threat:
 
-    # --- Automated Threat Suggestion ---
-    st.subheader("💡 2. Automated Threat Suggestions")
-    st.write("Based on your defined architecture, here are some suggested threats. Review and add them to your threat model.")
+        * **S - Spoofing:** Impersonating something or someone else. (e.g., an attacker pretending to be a legitimate user or server).
+        * **T - Tampering:** Modifying data or code. (e.g., an attacker altering data in transit or at rest).
+        * **R - Repudiation:** Denying an action without the ability to be disproven. (e.g., a user denying they performed a transaction).
+        * **I - Information Disclosure:** Exposing information to unauthorized individuals. (e.g., sensitive data leaks, improper error messages).
+        * **D - Denial of Service:** Preventing legitimate users from accessing a service. (e.g., a server being overwhelmed by requests).
+        * **E - Elevation of Privilege:** Gaining unauthorized higher-level access. (e.g., a regular user gaining administrative rights).
+        """)
+        st.markdown("---")
 
-    suggested_threats = []
+        # --- Automated Threat Suggestion ---
+        st.subheader("💡 2. Automated Threat Suggestions")
+        st.write("Based on your defined architecture, here are some suggested threats. Review and add them to your threat model.")
 
-    # Rule-based threat suggestion
-    for conn in st.session_state.architecture['connections']:
-        source_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['source_id']), None)
-        target_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['target_id']), None)
+        suggested_threats = []
 
-        if source_comp and target_comp:
-            # Rule 1: Internet-facing components (User -> Web Server/Load Balancer)
-            if source_comp['type'] == 'User' and (target_comp['type'] == 'Web Server' or target_comp['type'] == 'Load Balancer'):
-                likelihood = 4
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Phishing Attacks'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Spoofing', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 3
-                impact = 4
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'DDoS Attacks'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Denial of Service', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 2
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'SQL Injection'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 3
-                impact = 4
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Cross-Site Scripting (XSS)'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+        # Rule-based threat suggestion
+        for conn in st.session_state.architecture['connections']:
+            source_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['source_id']), None)
+            target_comp = next((c for c in st.session_state.architecture['components'] if c['id'] == conn['target_id']), None)
 
-            # Rule 2: Application to Database
-            if source_comp['type'] == 'Application Server' and target_comp['type'] == 'Database':
-                likelihood = 3
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Database Injection'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 2
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Data Exfiltration'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 2
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Unauthorized Data Access'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+            if source_comp and target_comp:
+                # Rule 1: Internet-facing components (User -> Web Server/Load Balancer)
+                if source_comp['type'] == 'User' and (target_comp['type'] == 'Web Server' or target_comp['type'] == 'Load Balancer'):
+                    likelihood = 4
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Phishing Attacks'
+                    # Only suggest if not already in the main threat model
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Spoofing', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 3
+                    impact = 4
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'DDoS Attacks'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Denial of Service', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 2
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'SQL Injection'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 3
+                    impact = 4
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Cross-Site Scripting (XSS)'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
 
-            # Rule 3: Connections crossing "Internal" boundaries (simplified)
-            if "internal" in conn['trust_boundary_crossing'].lower():
-                likelihood = 2
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Lateral Movement'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 2
-                impact = 4
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Internal Service Spoofing'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Spoofing', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                # Rule 2: Application to Database
+                if source_comp['type'] == 'Application Server' and target_comp['type'] == 'Database':
+                    likelihood = 3
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Database Injection'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 2
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Data Exfiltration'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 2
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Unauthorized Data Access'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
 
-            # Rule 4: External Integrations
-            if target_comp['type'] == 'External Service' or source_comp['type'] == 'External Service':
-                likelihood = 3
-                impact = 4
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'API Key Exposure'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 2
-                impact = 4
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Data Sharing Violation'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                # Rule 3: Connections crossing "Internal" boundaries (simplified)
+                if "internal" in conn['trust_boundary_crossing'].lower():
+                    likelihood = 2
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Lateral Movement'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 2
+                    impact = 4
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Internal Service Spoofing'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Spoofing', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
 
-            # Rule 5: Authentication Services
-            if target_comp['type'] == 'Authentication Service':
-                likelihood = 2
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Authentication Bypass'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 3
-                impact = 4
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Credential Stuffing'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                # Rule 4: External Integrations
+                if target_comp['type'] == 'External Service' or source_comp['type'] == 'External Service':
+                    likelihood = 3
+                    impact = 4
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'API Key Exposure'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 2
+                    impact = 4
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Data Sharing Violation'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Information Disclosure', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
 
-            # Rule 6: Core Banking System
-            if target_comp['type'] == 'Core Banking System':
-                likelihood = 2
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Financial Fraud'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
-                
-                likelihood = 2
-                impact = 5
-                risk_score, risk_level = calculate_risk(likelihood, impact)
-                threat_name = 'Transaction Manipulation'
-                if threat_name not in [t['name'] for b in st.session_state.threat_model.values() for t in b['threats']]:
-                    suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                # Rule 5: Authentication Services
+                if target_comp['type'] == 'Authentication Service':
+                    likelihood = 2
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Authentication Bypass'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 3
+                    impact = 4
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Credential Stuffing'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']]:
+                        suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
 
-    if suggested_threats:
-        # No need to recalculate risk_score/risk_level here as they are already in the dicts
-        df_suggested_threats = pd.DataFrame(suggested_threats)
-        
-        st.dataframe(df_suggested_threats[['name', 'category', 'likelihood', 'impact', 'risk_score', 'risk_level', 'boundary']], use_container_width=True)
+                # Rule 6: Core Banking System
+                if target_comp['type'] == 'Core Banking System':
+                    likelihood = 2
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Financial Fraud'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+                    
+                    likelihood = 2
+                    impact = 5
+                    risk_score, risk_level = calculate_risk(likelihood, impact)
+                    threat_name = 'Transaction Manipulation'
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
+                        suggested_threats.append({'name': threat_name, 'category': 'Tampering', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
+
+        if suggested_threats:
+            # No need to recalculate risk_score/risk_level here as they are already in the dicts
+            df_suggested_threats = pd.DataFrame(suggested_threats)
+            
+            st.dataframe(df_suggested_threats[['name', 'category', 'likelihood', 'impact', 'risk_score', 'risk_level', 'boundary']], use_container_width=True)
+
+            st.markdown("---")
+            st.subheader("Add Selected Suggested Threats to Threat Model")
+            
+            threat_names_to_add = st.multiselect(
+                "Select threats to add to your main threat model:",
+                [t['name'] for t in suggested_threats],
+                key="select_threats_to_add"
+            )
+
+            if st.button("Add Selected Threats"):
+                added_count = 0
+                for threat_name in threat_names_to_add:
+                    # Find the threat from the already prepared suggested_threats list
+                    threat_to_add = next((t for t in suggested_threats if t['name'] == threat_name), None)
+                    if threat_to_add:
+                        boundary_name = threat_to_add['boundary']
+                        if boundary_name not in st.session_state.threat_model:
+                            st.session_state.threat_model[boundary_name] = {
+                                'description': f"Automatically generated boundary from architecture: {boundary_name}",
+                                'components': [],
+                                'threats': []
+                            }
+                        
+                        existing_threat_names_in_boundary = [t['name'] for t in st.session_state.threat_model[boundary_name]['threats']]
+                        if threat_to_add['name'] not in existing_threat_names_in_boundary:
+                            new_threat_id = f"T_Arch_{str(uuid.uuid4())[:4]}"
+                            st.session_state.threat_model[boundary_name]['threats'].append({
+                                'id': new_threat_id,
+                                'name': threat_to_add['name'],
+                                'category': threat_to_add['category'],
+                                'likelihood': threat_to_add['likelihood'],
+                                'impact': threat_to_add['impact'],
+                                'risk_score': threat_to_add['risk_score'], # These keys are now guaranteed to exist
+                                'risk_level': threat_to_add['risk_level'], # These keys are now guaranteed to exist
+                                'mitigations': threat_to_add['mitigations'] # Include default mitigations
+                            })
+                            added_count += 1
+                if added_count > 0:
+                    st.success(f"Successfully added {added_count} selected threats to your threat model!")
+                    st.rerun()
+                else:
+                    st.info("No new threats were added (they might already exist or none were selected).")
+        else:
+            st.info("No threats suggested based on the current architecture. Define more components and connections.")
 
         st.markdown("---")
-        st.subheader("Add Selected Suggested Threats to Threat Model")
+
+        # --- Consolidated Threat Model Display and Management ---
+        st.subheader("🛡️ 3. Threat Model Overview & Management")
+        st.write("Review and manage all threats, their risks, and associated mitigations.")
+
+        all_threats_flat = []
+        for boundary, data in st.session_state.threat_model.items():
+            for threat in data['threats']:
+                all_threats_flat.append({**threat, 'boundary': boundary})
+
+        if not all_threats_flat:
+            st.info("No threats defined in your threat model yet. Add some via architecture suggestions or manually.")
+            return
+
+        # Filter by Risk Level (re-using sidebar filter)
+        st.markdown("#### Filter Threats")
+        risk_filter = st.multiselect(
+            "Filter by Risk Level (for display below)",
+            ["Critical", "High", "Medium", "Low"],
+            default=["Critical", "High", "Medium", "Low"],
+            key="threat_display_risk_filter"
+        )
+        filtered_threats_for_display = [t for t in all_threats_flat if t['risk_level'] in risk_filter]
+
+        if not filtered_threats_for_display:
+            st.info("No threats match the selected risk filter.")
+            return
+
+        # Display Threats in Cards
+        st.markdown("<div class='threat-grid'>", unsafe_allow_html=True)
+        for i, threat in enumerate(filtered_threats_for_display):
+            # Pre-construct mitigations HTML to avoid nested f-string issues
+            mitigations_html = ""
+            if threat['mitigations']:
+                mitigations_list_items = [f"<li>{m['type']}: {m['control']}</li>" for m in threat['mitigations']]
+                mitigations_html = "".join(mitigations_list_items)
+            else:
+                mitigations_html = "<li>No mitigations defined yet.</li>"
+
+            st.markdown(f"""
+            <div class="threat-card {threat['risk_level'].lower()}">
+                <div class="threat-header">
+                    <div class="threat-title">{threat['name']}</div>
+                    <div class="risk-score-display {threat['risk_level'].lower()}">{threat['risk_level'].upper()} ({threat['risk_score']})</div>
+                </div>
+                <div class="threat-content">
+                    <div class="threat-section-card">
+                        <h4>Trust Boundary:</h4>
+                        <p>{threat['boundary']}</p>
+                    </div>
+                    <div class="threat-section-card">
+                        <h4>STRIDE Category:</h4>
+                        <p>{threat['category']}</p>
+                    </div>
+                    <div class="threat-section-card">
+                        <h4>Risk Assessment:</h4>
+                        <p>Likelihood: {threat['likelihood']}/5 | Impact: {threat['impact']}/5</p>
+                    </div>
+                    <div class="mitigation-list">
+                        <h4>Mitigation Controls:</h4>
+                        <ul>
+                            {mitigations_html}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        # Detailed Threat and Mitigation Management (similar to old "Manage Threat Model" but streamlined)
+        st.subheader("Detailed Threat & Mitigation Editor")
         
-        threat_names_to_add = st.multiselect(
-            "Select threats to add to your main threat model:",
-            [t['name'] for t in suggested_threats],
-            key="select_threats_to_add"
+        # Create a unique list of all threats for selection
+        all_threats_flat = []
+        for boundary, data in st.session_state.threat_model.items():
+            for threat in data['threats']:
+                all_threats_flat.append({**threat, 'boundary': boundary})
+
+        all_threat_names_for_editor = [f"{t['name']} ({t['boundary']})" for t in all_threats_flat]
+        selected_threat_for_editor_display = st.selectbox(
+            "Select a Threat to Edit Mitigations or Details",
+            ["-- Select --"] + all_threat_names_for_editor,
+            key="select_threat_for_editor"
         )
 
-        if st.button("Add Selected Threats"):
-            added_count = 0
-            for threat_name in threat_names_to_add:
-                # Find the threat from the already prepared suggested_threats list
-                threat_to_add = next((t for t in suggested_threats if t['name'] == threat_name), None)
-                if threat_to_add:
-                    boundary_name = threat_to_add['boundary']
-                    if boundary_name not in st.session_state.threat_model:
-                        st.session_state.threat_model[boundary_name] = {
-                            'description': f"Automatically generated boundary from architecture: {boundary_name}",
-                            'components': [],
-                            'threats': []
-                        }
-                    
-                    existing_threat_names_in_boundary = [t['name'] for t in st.session_state.threat_model[boundary_name]['threats']]
-                    if threat_to_add['name'] not in existing_threat_names_in_boundary:
-                        new_threat_id = f"T_Arch_{str(uuid.uuid4())[:4]}"
-                        st.session_state.threat_model[boundary_name]['threats'].append({
-                            'id': new_threat_id,
-                            'name': threat_to_add['name'],
-                            'category': threat_to_add['category'],
-                            'likelihood': threat_to_add['likelihood'],
-                            'impact': threat_to_add['impact'],
-                            'risk_score': threat_to_add['risk_score'], # These keys are now guaranteed to exist
-                            'risk_level': threat_to_add['risk_level'], # These keys are now guaranteed to exist
-                            'mitigations': threat_to_add['mitigations'] # Include default mitigations
-                        })
-                        added_count += 1
-            if added_count > 0:
-                st.success(f"Successfully added {added_count} selected threats to your threat model!")
-                st.rerun()
-            else:
-                st.info("No new threats were added (they might already exist or none were selected).")
-    else:
-        st.info("No threats suggested based on the current architecture. Define more components and connections.")
+        if selected_threat_for_editor_display != "-- Select --":
+            # Find the actual threat object
+            selected_threat_name = selected_threat_for_editor_display.split(' (')[0]
+            selected_threat_boundary = selected_threat_for_editor_display.split(' (')[1][:-1] # Remove closing parenthesis
 
-    st.markdown("---")
+            selected_threat_obj = None
+            threat_idx_in_boundary = -1
+            for idx, t in enumerate(st.session_state.threat_model[selected_threat_boundary]['threats']):
+                if t['name'] == selected_threat_name:
+                    selected_threat_obj = t
+                    threat_idx_in_boundary = idx
+                    break
 
-    # --- Consolidated Threat Model Display and Management ---
-    st.subheader("🛡️ 3. Threat Model Overview & Management")
-    st.write("Review and manage all threats, their risks, and associated mitigations.")
+            if selected_threat_obj:
+                st.markdown(f"##### Editing: {selected_threat_obj['name']} in {selected_threat_boundary}")
 
-    all_threats_flat = []
-    for boundary, data in st.session_state.threat_model.items():
-        for threat in data['threats']:
-            all_threats_flat.append({**threat, 'boundary': boundary})
-
-    if not all_threats_flat:
-        st.info("No threats defined in your threat model yet. Add some via architecture suggestions or manually.")
-        return
-
-    # Filter by Risk Level (re-using sidebar filter)
-    st.markdown("#### Filter Threats")
-    risk_filter = st.multiselect(
-        "Filter by Risk Level (for display below)",
-        ["Critical", "High", "Medium", "Low"],
-        default=["Critical", "High", "Medium", "Low"],
-        key="threat_display_risk_filter"
-    )
-    filtered_threats_for_display = [t for t in all_threats_flat if t['risk_level'] in risk_filter]
-
-    if not filtered_threats_for_display:
-        st.info("No threats match the selected risk filter.")
-        return
-
-    # Display Threats in Cards
-    st.markdown("<div class='threat-grid'>", unsafe_allow_html=True)
-    for i, threat in enumerate(filtered_threats_for_display):
-        # Pre-construct mitigations HTML to avoid nested f-string issues
-        mitigations_html = ""
-        if threat['mitigations']:
-            mitigations_list_items = [f"<li>{m['type']}: {m['control']}</li>" for m in threat['mitigations']]
-            mitigations_html = "".join(mitigations_list_items)
-        else:
-            mitigations_html = "<li>No mitigations defined yet.</li>"
-
-        st.markdown(f"""
-        <div class="threat-card {threat['risk_level'].lower()}">
-            <div class="threat-header">
-                <div class="threat-title">{threat['name']}</div>
-                <div class="risk-score-display {threat['risk_level'].lower()}">{threat['risk_level'].upper()} ({threat['risk_score']})</div>
-            </div>
-            <div class="threat-content">
-                <div class="threat-section-card">
-                    <h4>Trust Boundary:</h4>
-                    <p>{threat['boundary']}</p>
-                </div>
-                <div class="threat-section-card">
-                    <h4>STRIDE Category:</h4>
-                    <p>{threat['category']}</p>
-                </div>
-                <div class="threat-section-card">
-                    <h4>Risk Assessment:</h4>
-                    <p>Likelihood: {threat['likelihood']}/5 | Impact: {threat['impact']}/5</p>
-                </div>
-                <div class="mitigation-list">
-                    <h4>Mitigation Controls:</h4>
-                    <ul>
-                        {mitigations_html}
-                    </ul>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # Detailed Threat and Mitigation Management (similar to old "Manage Threat Model" but streamlined)
-    st.subheader("Detailed Threat & Mitigation Editor")
-    
-    # Create a unique list of all threats for selection
-    all_threats_flat = []
-    for boundary, data in st.session_state.threat_model.items():
-        for threat in data['threats']:
-            all_threats_flat.append({**threat, 'boundary': boundary})
-
-    all_threat_names_for_editor = [f"{t['name']} ({t['boundary']})" for t in all_threats_flat]
-    selected_threat_for_editor_display = st.selectbox(
-        "Select a Threat to Edit Mitigations or Details",
-        ["-- Select --"] + all_threat_names_for_editor,
-        key="select_threat_for_editor"
-    )
-
-    if selected_threat_for_editor_display != "-- Select --":
-        # Find the actual threat object
-        selected_threat_name = selected_threat_for_editor_display.split(' (')[0]
-        selected_threat_boundary = selected_threat_for_editor_display.split(' (')[1][:-1] # Remove closing parenthesis
-
-        selected_threat_obj = None
-        threat_idx_in_boundary = -1
-        for idx, t in enumerate(st.session_state.threat_model[selected_threat_boundary]['threats']):
-            if t['name'] == selected_threat_name:
-                selected_threat_obj = t
-                threat_idx_in_boundary = idx
-                break
-
-        if selected_threat_obj:
-            st.markdown(f"##### Editing: {selected_threat_obj['name']} in {selected_threat_boundary}")
-
-            # Edit Threat Details
-            with st.expander(f"✏️ Edit Threat Details for '{selected_threat_obj['name']}'"):
-                with st.form(f"edit_threat_details_form_{selected_threat_obj['id']}", clear_on_submit=False):
-                    edited_threat_category = st.selectbox("STRIDE Category", ['Spoofing', 'Tampering', 'Repudiation', 'Information Disclosure', 'Denial of Service', 'Elevation of Privilege'], index=['Spoofing', 'Tampering', 'Repudiation', 'Information Disclosure', 'Denial of Service', 'Elevation of Privilege'].index(selected_threat_obj['category']), key=f"edit_threat_cat_details_{selected_threat_obj['id']}")
-                    edited_threat_likelihood = st.slider("Likelihood (1-5)", 1, 5, selected_threat_obj['likelihood'], key=f"edit_threat_lik_details_{selected_threat_obj['id']}")
-                    edited_threat_impact = st.slider("Impact (1-5)", 1, 5, selected_threat_obj['impact'], key=f"edit_threat_imp_details_{selected_threat_obj['id']}")
-                    
-                    if st.form_submit_button("Save Threat Details"):
-                        risk_score, risk_level = calculate_risk(edited_threat_likelihood, edited_threat_impact)
-                        st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary].update({
-                            'category': edited_threat_category,
-                            'likelihood': edited_threat_likelihood,
-                            'impact': edited_threat_impact,
-                            'risk_score': risk_score,
-                            'risk_level': risk_level
-                        })
-                        st.success(f"Threat details for '{selected_threat_obj['name']}' updated!")
-                        st.rerun()
-
-            # Manage Mitigations for this Threat
-            st.markdown(f"###### Mitigations for '{selected_threat_obj['name']}'")
-            
-            with st.expander(f"➕ Add New Mitigation for '{selected_threat_obj['name']}'"):
-                with st.form(f"add_mitigation_form_{selected_threat_obj['id']}", clear_on_submit=True):
-                    mitigation_type = st.selectbox("Mitigation Type", ["Preventive", "Detective", "Responsive"], key=f"new_mit_type_{selected_threat_obj['id']}")
-                    mitigation_control = st.text_area("Control Description", key=f"new_mit_control_{selected_threat_obj['id']}")
-                    
-                    if st.form_submit_button("Add Mitigation"):
-                        if mitigation_control:
-                            new_mitigation_id = str(uuid.uuid4())
-                            st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary]['mitigations'].append({
-                                'id': new_mitigation_id,
-                                'type': mitigation_type,
-                                'control': mitigation_control
+                # Edit Threat Details
+                with st.expander(f"✏️ Edit Threat Details for '{selected_threat_obj['name']}'"):
+                    with st.form(f"edit_threat_details_form_{selected_threat_obj['id']}", clear_on_submit=False):
+                        edited_threat_category = st.selectbox("STRIDE Category", ['Spoofing', 'Tampering', 'Repudiation', 'Information Disclosure', 'Denial of Service', 'Elevation of Privilege'], index=['Spoofing', 'Tampering', 'Repudiation', 'Information Disclosure', 'Denial of Service', 'Elevation of Privilege'].index(selected_threat_obj['category']), key=f"edit_threat_cat_details_{selected_threat_obj['id']}")
+                        edited_threat_likelihood = st.slider("Likelihood (1-5)", 1, 5, selected_threat_obj['likelihood'], key=f"edit_threat_lik_details_{selected_threat_obj['id']}")
+                        edited_threat_impact = st.slider("Impact (1-5)", 1, 5, selected_threat_obj['impact'], key=f"edit_threat_imp_details_{selected_threat_obj['id']}")
+                        
+                        if st.form_submit_button("Save Threat Details"):
+                            risk_score, risk_level = calculate_risk(edited_threat_likelihood, edited_threat_impact)
+                            st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary].update({
+                                'category': edited_threat_category,
+                                'likelihood': edited_threat_likelihood,
+                                'impact': edited_threat_impact,
+                                'risk_score': risk_score,
+                                'risk_level': risk_level
                             })
-                            st.success(f"Mitigation added for '{selected_threat_obj['name']}'!")
+                            st.success(f"Threat details for '{selected_threat_obj['name']}' updated!")
                             st.rerun()
-                        else:
-                            st.error("Control Description cannot be empty.")
-            
-            if selected_threat_obj['mitigations']:
-                st.markdown("Existing Mitigations:")
-                for j, mitigation in enumerate(selected_threat_obj['mitigations']):
-                    with st.expander(f"🛡️ {mitigation['type']}: {mitigation['control'][:50]}..."):
-                        with st.form(f"edit_mitigation_form_{mitigation['id']}", clear_on_submit=False):
-                            edited_mitigation_type = st.selectbox("Mitigation Type", ["Preventive", "Detective", "Responsive"], index=["Preventive", "Detective", "Responsive"].index(mitigation['type']), key=f"edit_mit_type_{mitigation['id']}")
-                            edited_mitigation_control = st.text_area("Control Description", value=mitigation['control'], key=f"edit_mit_control_{mitigation['id']}")
-                            
-                            col_buttons_mit = st.columns(2)
-                            with col_buttons_mit[0]:
-                                if st.form_submit_button("Save Mitigation Changes"):
-                                    st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary]['mitigations'][j].update({
-                                        'type': edited_mitigation_type,
-                                        'control': edited_mitigation_control
-                                    })
-                                    st.success("Mitigation updated!")
-                                    st.rerun()
-                            with col_buttons_mit[1]:
-                                if st.form_submit_button("Delete Mitigation"):
-                                    st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary]['mitigations'].pop(j)
-                                    st.success("Mitigation deleted!")
-                                    st.rerun()
-            else:
-                st.info("No mitigations added for this threat yet.")
-    else:
-        st.info("Select a threat above to manage its details and mitigations.")
+
+                # Manage Mitigations for this Threat
+                st.markdown(f"###### Mitigations for '{selected_threat_obj['name']}'")
+                
+                with st.expander(f"➕ Add New Mitigation for '{selected_threat_obj['name']}'"):
+                    with st.form(f"add_mitigation_form_{selected_threat_obj['id']}", clear_on_submit=True):
+                        mitigation_type = st.selectbox("Mitigation Type", ["Preventive", "Detective", "Responsive"], key=f"new_mit_type_{selected_threat_obj['id']}")
+                        mitigation_control = st.text_area("Control Description", key=f"new_mit_control_{selected_threat_obj['id']}")
+                        
+                        if st.form_submit_button("Add Mitigation"):
+                            if mitigation_control:
+                                new_mitigation_id = str(uuid.uuid4())
+                                st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary]['mitigations'].append({
+                                    'id': new_mitigation_id,
+                                    'type': mitigation_type,
+                                    'control': mitigation_control
+                                })
+                                st.success(f"Mitigation added for '{selected_threat_obj['name']}'!")
+                                st.rerun()
+                            else:
+                                st.error("Control Description cannot be empty.")
+                
+                if selected_threat_obj['mitigations']:
+                    st.markdown("Existing Mitigations:")
+                    for j, mitigation in enumerate(selected_threat_obj['mitigations']):
+                        with st.expander(f"🛡️ {mitigation['type']}: {mitigation['control'][:50]}..."):
+                            with st.form(f"edit_mitigation_form_{mitigation['id']}", clear_on_submit=False):
+                                edited_mitigation_type = st.selectbox("Mitigation Type", ["Preventive", "Detective", "Responsive"], index=["Preventive", "Detective", "Responsive"].index(mitigation['type']), key=f"edit_mit_type_{mitigation['id']}")
+                                edited_mitigation_control = st.text_area("Control Description", value=mitigation['control'], key=f"edit_mit_control_{mitigation['id']}")
+                                
+                                col_buttons_mit = st.columns(2)
+                                with col_buttons_mit[0]:
+                                    if st.form_submit_button("Save Mitigation Changes"):
+                                        st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary]['mitigations'][j].update({
+                                            'type': edited_mitigation_type,
+                                            'control': edited_mitigation_control
+                                        })
+                                        st.success("Mitigation updated!")
+                                        st.rerun()
+                                with col_buttons_mit[1]:
+                                    if st.form_submit_button("Delete Mitigation"):
+                                        st.session_state.threat_model[selected_threat_boundary]['threats'][threat_idx_in_boundary]['mitigations'].pop(j)
+                                        st.success("Mitigation deleted!")
+                                        st.rerun()
+                else:
+                    st.info("No mitigations added for this threat yet.")
+        else:
+            st.info("Select a threat above to manage its details and mitigations.")
 
 def render_trust_boundary_details():
     st.subheader("🌐 Trust Boundary Details")
