@@ -447,7 +447,7 @@ DEFAULT_MITIGATIONS = {
         {'type': 'Preventive', 'control': 'Implement strong data integrity checks for all transactions'},
         {'type': 'Preventive', 'control': 'Use cryptographic signatures for transaction data'},
         {'type': 'Detective', 'control': 'Reconcile transactions regularly and detect discrepancies'}
-    ],
+    '},
     'Order Repudiation': [
         {'type': 'Preventive', 'control': 'Implement comprehensive audit logging for all order actions'},
         {'type': 'Preventive', 'control': 'Send email/SMS confirmations for critical order states'},
@@ -1115,7 +1115,7 @@ def render_threat_model_dashboard():
                     'External Partner Network': {{x: 700, y: 350, width: 250, height: 150, label: 'External Partner Network Boundary'}}
                 }};
 
-                // Only draw a predefined visual boundary if it exists in the activeBoundariesForDrawing list
+                # Only draw a predefined visual boundary if it exists in the activeBoundariesForDrawing list
                 activeBoundariesForDrawing.forEach(boundaryName => {{
                     if (predefinedVisualBoundaries[boundaryName]) {{
                         const boundary = predefinedVisualBoundaries[boundaryName];
@@ -1444,7 +1444,6 @@ def render_threat_model_dashboard():
                     impact = 5
                     risk_score, risk_level = calculate_risk(likelihood, impact)
                     threat_name = 'Phishing Attacks'
-                    # Always suggest relevant threats based on the current connection/architecture
                     suggested_threats.append({'name': threat_name, 'category': 'Spoofing', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
                     
                     likelihood = 3
