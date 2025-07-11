@@ -1035,6 +1035,7 @@ def render_threat_model_dashboard():
 
                     // Add event listener for dragging to the rect
                     rect.addEventListener('mousedown', (event) => {{
+                        event.stopPropagation(); // Prevent SVG click from deselecting
                         isDragging = true;
                         activeElement = rect;
                         activeNodeId = node.id;
@@ -1536,7 +1537,7 @@ def render_threat_model_dashboard():
                     impact = 4
                     risk_score, risk_level = calculate_risk(likelihood, impact)
                     threat_name = 'Credential Stuffing'
-                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']]:
+                    if not any(t['name'] == threat_name for b in st.session_state.threat_model.values() for t in b['threats']):
                         suggested_threats.append({'name': threat_name, 'category': 'Elevation of Privilege', 'likelihood': likelihood, 'impact': impact, 'risk_score': risk_score, 'risk_level': risk_level, 'boundary': conn['trust_boundary_crossing'], 'mitigations': DEFAULT_MITIGATIONS.get(threat_name, [])})
 
                 # Rule 6: Core Banking System
